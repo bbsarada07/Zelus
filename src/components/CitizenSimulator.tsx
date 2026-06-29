@@ -3,11 +3,11 @@ import {
   Camera, Award, PlusCircle, X, Mic,
   MapPin, MicOff, ChevronDown, RotateCcw,
   PawPrint, Trees, Trash2, Users, Zap, Droplets, Construction,
-  ThumbsUp, Clock
+  ThumbsUp, Clock, AlertCircle
 } from 'lucide-react';
 import { useZelus } from '../context/ZelusStateContext';
 import { MunicipalTrustMatrix } from './MunicipalTrustMatrix';
-import type { IncidentCategory } from '../types';
+import type { IncidentCategory, Incident } from '../types';
 
 const CATEGORIES: { label: IncidentCategory; icon: React.ReactNode; color: string }[] = [
   { label: 'Road & Structural Damage',    icon: <Construction className="w-3.5 h-3.5"/>, color: '#FFCC00' },
@@ -23,7 +23,7 @@ const LANGUAGES = ['Mandarin', 'Telugu', 'Spanish', 'Hindi', 'Arabic', 'French',
 
 const TRANSLATIONS: Record<string, string> = {
   Mandarin: '此市民报告记录了市政基础设施节点的明显退化。损坏严重程度分类要求优先派遣合格的维护团队进行即时评估和补救。',
-  Telugu:   'రహదారి ఉపరితలం వద్ద గణనీయమైన నిర్మాణ నష్టం జరిగింది. పెడస్ట్రియన్లు మరియు వాహనదారులకు ప్రమాదకర పరిస్థితులు ఏర్పడుతున్నాయి. తక్షణ మరమ్మత్తు అవసరం.',
+  Telugu:   'రహదారి ఉపరితలం వద్ద గణనీయమైన నిర్మాణ నష్టం జరిగింది. పెడస్ట్రియన్లు మరియు వాహనదారులకు ప్రమాదకర పరిస్థితులు ఏర్పడుతున్నాయి. தక్షణ మరమ్మత్తు అవసరం.',
   Spanish:  'Hay daños estructurales significativos en la superficie de la carretera en esta ubicación. Múltiples grietas y material inestable están creando un peligro.',
   Hindi:    'सूचित स्थान पर सार्वजनिक बुनियादी ढांचे में गंभीर क्षति देखी गई है। जलभराव और सतह का विस्थापन इंगित करता है कि तत्काल मरम्मत की आवश्यकता है।',
   Arabic:   'تم اكتشاف خلل في البنية التحتية في الموقع المحدد. يرجى إرسال فريق الصيانة فوراً لتجنب الحوادث.',
@@ -31,7 +31,7 @@ const TRANSLATIONS: Record<string, string> = {
   Tamil:    'குறிப்பிட்ட ஒருங்கிணைப்புகளில் பொது உள்கட்டமைப்பு சேதம் பதிவாகியுள்ளது. விபத்துகளைத் தவிர்க்க உடனடியாகப் பழுதுபார்க்க பரிந்துரைக்கப்படுகிறது.',
 };
 
-// Preset details mapping
+// Preset details mapping (matching Pothole, Water Leak, and Sanitation)
 const PRESETS = {
   pothole: {
     category: 'Road & Structural Damage' as IncidentCategory,
@@ -51,18 +51,18 @@ const PRESETS = {
     scanText: '[VISION: WATER BURST DETECTED | PRESSURE LOSS ACTIVE | CONFIDENCE 99.1%]',
     severity: 'Critical' as const,
   },
-  utility: {
-    category: 'Utility & Spark Hazard' as IncidentCategory,
-    location: '17.4461°N, 78.5178°E (Grid-8 Overhead Insulator)',
-    x: 32.8,
-    y: 71.4,
-    notes: 'High-voltage overhead cable snapping and creating electrical sparks near public trees.',
-    scanText: '[VISION: ARCS DETECTED | RISK WEIGHT: 9.4/10 | CONFIDENCE 96.8%]',
-    severity: 'Critical' as const,
+  sanitation: {
+    category: 'Sanitation Operations' as IncidentCategory,
+    location: '17.4439°N, 78.5221°E (Precinct-2 Refuse Overspill)',
+    x: 39.4,
+    y: 52.8,
+    notes: 'Overflowing public waste bin containing municipal refuse blocking pedestrian pavement pathway.',
+    scanText: '[VISION: REFUSE OVERFLOW DETECTED | ACCUMULATION HAZARD | CONFIDENCE 98.4%]',
+    severity: 'Moderate' as const,
   }
 };
 
-type ScenePreset = 'pothole' | 'water' | 'utility';
+type ScenePreset = 'pothole' | 'water' | 'sanitation';
 
 function drawScene(canvas: HTMLCanvasElement, preset: ScenePreset) {
   const ctx = canvas.getContext('2d');
@@ -134,35 +134,32 @@ function drawScene(canvas: HTMLCanvasElement, preset: ScenePreset) {
     ctx.font = 'bold 9px monospace';
     ctx.fillText('HYDRO_BURST // 99.1%', W * 0.5 - 37, H * 0.35 - 25);
 
-  } else if (preset === 'utility') {
-    // Utility cabinet backdrop
-    ctx.fillStyle = '#1A1D20';
+  } else if (preset === 'sanitation') {
+    // Concrete path
+    ctx.fillStyle = '#2A2C2E';
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#0D0F11';
-    ctx.fillRect(W * 0.35, H * 0.15, W * 0.3, H * 0.7);
-    // Sparks & electric arcs (jagged paths)
-    ctx.strokeStyle = '#FFCC00';
-    ctx.lineWidth = 2;
+    // Overspill bin outline
+    ctx.fillStyle = '#4B5563';
+    ctx.fillRect(W * 0.4, H * 0.3, W * 0.2, H * 0.6);
+    // Garbage bags & piles (random shapes)
+    ctx.fillStyle = '#111827';
     ctx.beginPath();
-    ctx.moveTo(W * 0.5, H * 0.3);
-    ctx.lineTo(W * 0.45, H * 0.4);
-    ctx.lineTo(W * 0.55, H * 0.45);
-    ctx.lineTo(W * 0.48, H * 0.55);
-    ctx.stroke();
-    // Spark dots
-    ctx.fillStyle = '#FF3B30';
-    for (let i = 0; i < 15; i++) {
-      ctx.beginPath();
-      ctx.arc(W * 0.5 + (Math.random() * 40 - 20), H * 0.4 + (Math.random() * 40 - 20), 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Bounding scanning box
-    ctx.strokeStyle = '#FF3B30';
+    ctx.arc(W * 0.4, H * 0.8, 14, 0, Math.PI * 2);
+    ctx.arc(W * 0.6, H * 0.85, 12, 0, Math.PI * 2);
+    ctx.arc(W * 0.5, H * 0.9, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#374151';
+    ctx.beginPath();
+    ctx.arc(W * 0.38, H * 0.84, 8, 0, Math.PI * 2);
+    ctx.arc(W * 0.62, H * 0.88, 7, 0, Math.PI * 2);
+    ctx.fill();
+    // Bounding Scanning Box
+    ctx.strokeStyle = '#00FFCC';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(W * 0.3, H * 0.2, W * 0.4, H * 0.5);
-    ctx.fillStyle = '#FF3B30';
+    ctx.strokeRect(W * 0.3, H * 0.25, W * 0.4, H * 0.65);
+    ctx.fillStyle = '#00FFCC';
     ctx.font = 'bold 9px monospace';
-    ctx.fillText('HIGH_VOLT_ARC // RISK 9.4', W * 0.3 + 3, H * 0.2 - 6);
+    ctx.fillText('REFUSE_ACCUM // 98.4%', W * 0.3 + 3, H * 0.25 - 6);
   }
 
   // Common HUD crosshair overlay
@@ -212,7 +209,7 @@ function getCatIcon(cat: string): React.ReactNode {
 export const CitizenSimulator: React.FC = () => {
   const {
     incidents, session, addIncident, upvoteIncident,
-    updateKarma, confirmResolution, sectorGrades, trustScore, addToast
+    updateKarma, confirmResolution, sectorGrades, trustScore, addToast, updateIncidentSync
   } = useZelus();
 
   const [activeTab, setActiveTab] = useState<'feed' | 'report' | 'ledger'>('feed');
@@ -226,8 +223,12 @@ export const CitizenSimulator: React.FC = () => {
   const [reportSeverity, setReportSeverity] = useState<'Critical' | 'Moderate' | 'Low'>('Moderate');
   const [languageBadge, setLanguageBadge] = useState<string | null>(null);
 
-  // Fallback Camera State
+  // Dual-mode Camera State
   const [cameraActive, setCameraActive] = useState(false);
+  const [mediaMode, setMediaMode] = useState<'idle' | 'live' | 'emulated'>('idle');
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   const [activeScene, setActiveScene] = useState<ScenePreset | null>(null);
   const [scanningScene, setScanningScene] = useState(false);
   const [visionScanText, setVisionScanText] = useState('');
@@ -248,10 +249,17 @@ export const CitizenSimulator: React.FC = () => {
   const [generatedId, setGeneratedId] = useState('');
   const [karmaTransactions, setKarmaTransactions] = useState<Array<{id:string;msg:string;xp:string;time:string}>>([]);
 
+  // Feed Filter chips: 'all' | 'critical' | 'radar'
+  const [feedFilter, setFeedFilter] = useState<'all' | 'critical' | 'radar'>('all');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Background sync state per ticket ID
+  const [backgroundSyncs, setBackgroundSyncs] = useState<Record<string, { step: number; status: 'syncing' | 'synced' | 'failed' }>>({});
+
   const PROCESSING_STEPS = [
-    '[ANALYZING VISUAL PRESET EVIDENCE...]',
-    '[COMPUTING NATIVE GPS ROUTING SECTOR...]',
-    '[COMMITTING IMMUTABLE CIVIC REGISTRY ENTITY...]',
+    '[ ANALYZING EVIDENCE MEDIA... ]',
+    '[ COMPUTING GEOSPATIAL DATA... ]',
+    '[ COMMITTING TO IMMUTABLE CIVIC LEDGER... ]',
   ];
 
   // Geolocation & reverse-geocoding engine state
@@ -318,12 +326,38 @@ export const CitizenSimulator: React.FC = () => {
     return dist <= 1.0;
   });
 
-  // Activate Camera Simulator HUD
-  const activateCamera = () => {
+  // Activate Camera with getUserMedia wrappers and Fallbacks
+  const activateCamera = async () => {
     setCameraActive(true);
     setActiveScene(null);
     setVisionScanText('');
+    setMediaMode('idle');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setLiveStream(stream);
+      setMediaMode('live');
+    } catch (e) {
+      setMediaMode('emulated');
+      addToast('⚠️ Native media streams restricted. Activating emulated hardware grid.', 'warning');
+    }
   };
+
+  // Assign live stream source
+  useEffect(() => {
+    if (mediaMode === 'live' && liveStream && videoRef.current) {
+      videoRef.current.srcObject = liveStream;
+    }
+  }, [liveStream, mediaMode]);
+
+  // Cleanup media stream
+  useEffect(() => {
+    return () => {
+      if (liveStream) {
+        liveStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [liveStream]);
 
   // Trigger preset action
   const selectPreset = (key: ScenePreset) => {
@@ -331,8 +365,8 @@ export const CitizenSimulator: React.FC = () => {
     setReportCategory(data.category);
     
     // Auto-fill latitude/longitude to match preset location
-    const presetLat = key === 'pothole' ? 17.4485 : key === 'water' ? 17.4512 : 17.4461;
-    const presetLng = key === 'pothole' ? 78.5204 : key === 'water' ? 78.5289 : 78.5178;
+    const presetLat = key === 'pothole' ? 17.4485 : key === 'water' ? 17.4512 : 17.4439;
+    const presetLng = key === 'pothole' ? 78.5204 : key === 'water' ? 78.5289 : 78.5221;
     setGeoCoords({ lat: presetLat, lng: presetLng });
     setReportX(data.x);
     setReportY(data.y);
@@ -343,6 +377,7 @@ export const CitizenSimulator: React.FC = () => {
     setActiveScene(key);
     setScanningScene(true);
     setCameraActive(true);
+    setMediaMode('emulated');
 
     setTimeout(() => {
       setScanningScene(false);
@@ -354,82 +389,161 @@ export const CitizenSimulator: React.FC = () => {
   };
 
   // Audio recording handlers
-  const startRecording = () => {
+  const startRecording = async () => {
     setIsRecording(true);
     setRecordingTime(0);
     setTranscriptText('');
+    setLanguageBadge(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      (window as any).currentAudioStream = stream;
+    } catch (e) {
+      addToast('⚠️ Microphone access restricted. Activating audio emulation engine.', 'warning');
+    }
+
     recordTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
   };
 
   const stopRecording = () => {
     setIsRecording(false);
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
-    setTranscribing(true);
-    setLanguageBadge(selectedLanguage);
+    
+    if ((window as any).currentAudioStream) {
+      try {
+        ((window as any).currentAudioStream as MediaStream).getTracks().forEach(t => t.stop());
+        (window as any).currentAudioStream = null;
+      } catch (e) {}
+    }
 
-    setTimeout(() => {
-      setTranscribing(false);
-      const rawText = TRANSLATIONS[selectedLanguage] || TRANSLATIONS.Mandarin;
-      const engTranslation = "This civic report documents observable degradation of a municipal infrastructure node. The damage severity classification warrants priority dispatch of a qualified maintenance team for immediate assessment and remediation.";
-      
-      setTranscriptText(`Raw Ingestion:\n"${rawText}"\n\nEnglish Translation:\n"${engTranslation}"\n\n[AUDIO SOURCE LOCALIZED -> TRANSLATED FROM LOCAL DIALECT TO EN-US ACCURACY: 99.1%]`);
-      setReportNotes(engTranslation);
-    }, 1500);
+    setTranscribing(true);
+
+    let tick = 0;
+    const tickInterval = setInterval(() => {
+      tick++;
+      if (tick >= 3) {
+        clearInterval(tickInterval);
+        setTranscribing(false);
+        setLanguageBadge(selectedLanguage);
+        
+        const rawText = TRANSLATIONS[selectedLanguage] || TRANSLATIONS.Mandarin;
+        const engTranslation = "This civic report documents observable degradation of a municipal infrastructure node. The damage severity classification warrants priority dispatch of a qualified maintenance team for immediate assessment and remediation.";
+        
+        setTranscriptText(`Raw Ingestion:\n"${rawText}"\n\nEnglish Translation:\n"${engTranslation}"\n\n[ AUDIO SOURCE LOCALIZED -> TRANSLATED TO EN-US ACCURACY: 99.1% ]`);
+        setReportNotes(engTranslation);
+      }
+    }, 500);
   };
 
-  useEffect(() => () => { if (recordTimerRef.current) clearInterval(recordTimerRef.current); }, []);
-
-  // Multi-stage loader submission intercept
-  const handleSubmit = useCallback(() => {
-    if (!reportNotes && !transcriptText) return;
-    setSubmitPhase('processing');
+  // Background sync worker execution
+  const runBackgroundSync = useCallback((ticketId: string) => {
+    setBackgroundSyncs(prev => ({
+      ...prev,
+      [ticketId]: { step: 0, status: 'syncing' }
+    }));
     setProcessingStep(0);
 
-    let step = 0;
+    let currentStep = 0;
     const interval = setInterval(() => {
-      step++;
-      setProcessingStep(step);
-      if (step >= PROCESSING_STEPS.length) {
+      currentStep++;
+      setProcessingStep(currentStep);
+
+      if (currentStep < PROCESSING_STEPS.length) {
+        setBackgroundSyncs(prev => {
+          if (!prev[ticketId] || prev[ticketId].status === 'failed') {
+            clearInterval(interval);
+            return prev;
+          }
+          return {
+            ...prev,
+            [ticketId]: { step: currentStep, status: 'syncing' }
+          };
+        });
+      } else {
         clearInterval(interval);
         
-        // Generate random Ticket ID
-        const ticketNum = Math.floor(Math.random() * 900 + 100);
-        const ticketChar = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-        const newId = `INC-2026-${ticketChar}${ticketNum}`;
-        setGeneratedId(newId);
-
-        // Commit to state context
-        addIncident({
-          category: reportCategory,
-          location: reportLocation,
-          coordinates: [reportX, reportY],
-          severity: reportSeverity,
-          status: 'Triage',
-          upvotes: 1,
-          description: reportNotes || transcriptText,
-          languageBadge: languageBadge,
-          image: activeScene ? `/${activeScene}.png` : '/road_pothole.png',
-          notes: reportNotes || transcriptText,
-          geolocation: { lat: geoCoords.lat, lng: geoCoords.lng },
-          exifVerified: true,
-          hash: `0x${Array.from({length:16},()=>Math.floor(Math.random()*16).toString(16)).join('').toUpperCase()}`,
-          materials: [],
-        });
-
-        // Assign XP
-        updateKarma(10);
-        setKarmaTransactions(p => [{
-          id: `KT-${Date.now()}`,
-          msg: `Civic ticket ${newId} filed`,
-          xp: '+10 XP',
-          time: new Date().toLocaleTimeString(),
-        }, ...p]);
-
-        addToast('✅ Civic ticket filed successfully! +10 Civic Karma points assigned.', 'success');
-        setSubmitPhase('success');
+        // 20% simulated background sync failure rate
+        const isFailure = Math.random() < 0.2;
+        if (isFailure) {
+          setBackgroundSyncs(prev => ({
+            ...prev,
+            [ticketId]: { step: 2, status: 'failed' }
+          }));
+          updateIncidentSync(ticketId, false, true); // mark failed
+          addToast('⚠️ Sync Error: Tap failed toast notification to retry.', 'error');
+        } else {
+          setBackgroundSyncs(prev => ({
+            ...prev,
+            [ticketId]: { step: 3, status: 'synced' }
+          }));
+          updateIncidentSync(ticketId, false, false); // mark synced
+          addToast(`✅ Incident ${ticketId} committed to immutable civic ledger.`, 'success');
+        }
       }
-    }, 500); // 3 steps * 500ms = 1.5 seconds exactly
-  }, [reportNotes, transcriptText, reportCategory, reportLocation, reportX, reportY, reportSeverity, languageBadge, activeScene, geoCoords, addIncident, updateKarma, addToast]);
+    }, 500);
+  }, [updateIncidentSync, addToast, PROCESSING_STEPS.length]);
+
+  const handleRetrySync = useCallback((ticketId: string) => {
+    updateIncidentSync(ticketId, true, false);
+    runBackgroundSync(ticketId);
+    addToast(`🔄 Re-syncing incident ${ticketId} in background...`, 'info');
+  }, [runBackgroundSync, updateIncidentSync, addToast]);
+
+  // Listen to tap-to-retry actions from global toasts
+  useEffect(() => {
+    const handleRetryEvent = () => {
+      const failed = incidents.find(i => i.syncError);
+      if (failed) {
+        handleRetrySync(failed.id);
+      }
+    };
+    window.addEventListener('zelus-retry-sync', handleRetryEvent);
+    return () => window.removeEventListener('zelus-retry-sync', handleRetryEvent);
+  }, [incidents, handleRetrySync]);
+
+  // Optimistic UI - instant transition to success screen
+  const handleSubmit = useCallback(() => {
+    if (!reportNotes && !transcriptText) return;
+
+    // Calculate deterministic next incident ID
+    const nextId = `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`;
+    setGeneratedId(nextId);
+
+    // Commit to state context immediately (marked with pendingSync: true)
+    addIncident({
+      category: reportCategory,
+      location: reportLocation,
+      coordinates: [reportX, reportY],
+      severity: reportSeverity,
+      status: 'Triage',
+      upvotes: 1,
+      description: reportNotes || transcriptText,
+      languageBadge: languageBadge,
+      image: activeScene ? `/${activeScene}.png` : '/road_pothole.png',
+      notes: reportNotes || transcriptText,
+      geolocation: { lat: geoCoords.lat, lng: geoCoords.lng },
+      exifVerified: true,
+      hash: `0x${Array.from({length:16},()=>Math.floor(Math.random()*16).toString(16)).join('').toUpperCase()}`,
+      materials: [],
+      pendingSync: true,
+      syncError: false,
+    });
+
+    // Assign XP
+    updateKarma(10);
+    setKarmaTransactions(p => [{
+      id: `KT-${Date.now()}`,
+      msg: `Civic ticket ${nextId} filed`,
+      xp: '+10 XP',
+      time: new Date().toLocaleTimeString(),
+    }, ...p]);
+
+    // Move to success screen immediately (Optimistic UI)
+    setSubmitPhase('success');
+
+    // Run sync worker in background
+    runBackgroundSync(nextId);
+  }, [incidents.length, reportNotes, transcriptText, reportCategory, reportLocation, reportX, reportY, reportSeverity, languageBadge, activeScene, geoCoords, addIncident, updateKarma, runBackgroundSync]);
 
   const resetForm = () => {
     setSubmitPhase('form');
@@ -442,11 +556,40 @@ export const CitizenSimulator: React.FC = () => {
     setRecordingTime(0);
     setReportCategory('Road & Structural Damage');
     setReportSeverity('Moderate');
-    setActiveTab('feed'); // Safely navigate back to maps/feed
+    setMediaMode('idle');
+    if (liveStream) {
+      liveStream.getTracks().forEach(t => t.stop());
+      setLiveStream(null);
+    }
+    setActiveTab('feed');
   };
 
-  const feedIncidents = incidents.slice(0, 15);
   const reviewable = incidents.filter(i => i.status === 'Peer_Review');
+
+  // Filter chips selection handler
+  const filteredIncidents = incidents.filter(inc => {
+    if (feedFilter === 'critical') return inc.severity === 'Critical';
+    if (feedFilter === 'radar') {
+      const incGeo = inc.geolocation || { lat: 17.4501, lng: 78.5252 };
+      return getDistanceKm(geoCoords.lat, geoCoords.lng, incGeo.lat, incGeo.lng) <= 1.0;
+    }
+    return true;
+  });
+
+  // Group filtered incidents by category
+  const groupedIncidents: Record<string, Incident[]> = {};
+  filteredIncidents.forEach(inc => {
+    const cat = inc.category;
+    if (!groupedIncidents[cat]) groupedIncidents[cat] = [];
+    groupedIncidents[cat].push(inc);
+  });
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [cat]: !prev[cat]
+    }));
+  };
 
   const StatusBadge = ({ status }: { status: string }) => {
     const map: Record<string, [string, string]> = {
@@ -458,28 +601,29 @@ export const CitizenSimulator: React.FC = () => {
     };
     const [color, bg] = map[status] || ['var(--text-muted)', 'rgba(100,116,139,0.1)'];
     return (
-      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border" style={{ color, backgroundColor: bg, borderColor: `${color}40` }}>
+      <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border" style={{ color, backgroundColor: bg, borderColor: `${color}40` }}>
         {status.replace(/_/g, ' ')}
       </span>
     );
   };
 
+  const currentSync = backgroundSyncs[generatedId] || { step: 0, status: 'synced' };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="flex-1 flex flex-col overflow-hidden w-full max-w-full" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
 
       {/* Proximity Radar Matrix Section */}
-      <div className="p-3 bg-var(--bg-secondary) border-b" style={{ borderColor: 'var(--border-secondary)' }}>
+      <div className="p-3 bg-var(--bg-secondary) border-b w-full" style={{ borderColor: 'var(--border-secondary)' }}>
         <div className="rounded-xl border p-3.5 space-y-3 relative overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
           <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border-secondary)' }}>
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <span className="text-[10px] font-mono font-bold text-[var(--text-primary)] uppercase tracking-wider">Hyperlocal Proximity Radar</span>
+              <span className="text-[12px] font-mono font-bold text-[var(--text-primary)] uppercase tracking-wider">Hyperlocal Proximity Radar</span>
             </div>
-            <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-emerald-550/30 text-[var(--accent-green)] bg-emerald-500/5">GEOFENCE ACTIVE</span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-emerald-550/30 text-[var(--accent-green)] bg-emerald-500/5">GEOFENCE ACTIVE</span>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Pulsing Radar Ring Visual */}
             <div className="w-14 h-14 rounded-full border border-cyan-500/30 relative flex items-center justify-center bg-cyan-950/20 flex-shrink-0">
               <div className="absolute inset-2 rounded-full border border-cyan-500/20" />
               <div className="absolute inset-4 rounded-full border border-cyan-500/10" />
@@ -488,10 +632,10 @@ export const CitizenSimulator: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <p className="text-[11px] font-bold text-[var(--text-primary)]">
+              <p className="text-[0.95rem] font-bold text-[var(--text-primary)]">
                 {nearbyAnomalies.length} structural anomalies detected
               </p>
-              <p className="text-[9px] font-mono text-[var(--text-muted)] leading-tight">
+              <p className="text-[11px] font-mono text-[var(--text-muted)] leading-tight">
                 Active issues identified within a 1.0 km radius of your paired GPS target location.
               </p>
             </div>
@@ -500,36 +644,63 @@ export const CitizenSimulator: React.FC = () => {
       </div>
 
       {/* ── Tab content area ── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto w-full">
 
         {/* ═══ FEED TAB ═══════════════════════════════════════════════════ */}
         {activeTab === 'feed' && (
-          <div className="p-3 space-y-3">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">Live Civic Feed</h3>
-              <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{feedIncidents.length} active tickets</span>
+          <div className="p-3 space-y-3 w-full">
+            <div className="flex flex-col gap-2 mb-2 w-full">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[1.25rem] font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">Live Civic Feed</h3>
+                <span className="text-[11px] font-mono text-[var(--text-muted)]">{filteredIncidents.length} active tickets</span>
+              </div>
+
+              {/* Feed Filter Chips */}
+              <div className="flex gap-1.5 overflow-x-auto py-1">
+                {([
+                  { id: 'all', label: 'All Incidents' },
+                  { id: 'critical', label: 'Critical Urgency' },
+                  { id: 'radar', label: 'Within 1KM' },
+                ] as const).map(chip => {
+                  const active = feedFilter === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      onClick={() => setFeedFilter(chip.id)}
+                      className="px-3 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer transition-all border shrink-0"
+                      style={{
+                        borderColor: active ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                        backgroundColor: active ? 'var(--accent-cyan)' : 'var(--bg-secondary)',
+                        color: active ? 'var(--bg-primary)' : 'var(--text-muted)'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Peer review section */}
             {reviewable.length > 0 && (
-              <div className="rounded-lg border p-3 space-y-2" style={{ backgroundColor: 'rgba(139,92,246,0.06)', borderColor: 'rgba(139,92,246,0.25)' }}>
-                <p className="text-[10px] font-mono font-bold uppercase tracking-wider" style={{ color: 'var(--accent-purple)' }}>
+              <div className="rounded-lg border p-3 space-y-2 w-full" style={{ backgroundColor: 'rgba(139,92,246,0.06)', borderColor: 'rgba(139,92,246,0.25)' }}>
+                <p className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: 'var(--accent-purple)' }}>
                   🗳 Consensus Vote Required ({reviewable.length})
                 </p>
                 {reviewable.map(inc => {
                   const alreadyVoted = (inc.verifications||[]).some(v => v.name === session?.username);
                   const voteCount = (inc.verifications||[]).length;
                   return (
-                    <div key={inc.id} className="rounded border p-2.5 space-y-2" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[11px] font-bold text-[var(--text-primary)]">{inc.category}</p>
-                          <p className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>{inc.location}</p>
+                    <div key={inc.id} className="rounded border p-2.5 space-y-2 w-full" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[0.95rem] font-bold text-[var(--text-primary)] truncate">{inc.category}</p>
+                          <p className="text-[11px] font-mono text-[var(--text-muted)] truncate">{inc.location}</p>
                         </div>
                         <StatusBadge status={inc.status} />
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                        <span className="text-[11px] font-mono text-[var(--text-muted)]">
                           {voteCount}/3 confirmations
                         </span>
                         <button
@@ -544,7 +715,7 @@ export const CitizenSimulator: React.FC = () => {
                               updateKarma(15);
                             }
                           }}
-                          className="text-[9px] font-mono font-bold px-2 py-1 rounded border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                          className="text-[11px] font-mono font-bold px-2 py-1 rounded border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                           style={{
                             color: alreadyVoted ? 'var(--text-muted)' : 'var(--accent-purple)',
                             borderColor: alreadyVoted ? 'var(--border-secondary)' : 'rgba(139,92,246,0.4)',
@@ -560,53 +731,105 @@ export const CitizenSimulator: React.FC = () => {
               </div>
             )}
 
-            {/* Feed cards */}
-            {feedIncidents.map(inc => {
-              const color = getCatColor(inc.category);
-              return (
-                <div key={inc.id} className="rounded-lg border p-3 space-y-2 transition-all duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', borderLeftColor: color, borderLeftWidth: 3 }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span style={{ color }}>{getCatIcon(inc.category)}</span>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold text-[var(--text-primary)] truncate">{inc.category}</p>
-                        <p className="text-[9px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
-                          <MapPin className="w-2.5 h-2.5 inline mr-0.5"/>{inc.location}
-                        </p>
-                      </div>
+            {/* Collapsible Category Accordions */}
+            <div className="space-y-2 w-full">
+              {Object.keys(groupedIncidents).length === 0 ? (
+                <p className="text-[11px] font-mono text-center py-10 text-[var(--text-muted)]">[ No incidents found ]</p>
+              ) : (
+                Object.keys(groupedIncidents).map(catName => {
+                  const catIncidents = groupedIncidents[catName];
+                  const isExpanded = expandedCategories[catName] || false;
+                  const color = getCatColor(catName);
+
+                  return (
+                    <div key={catName} className="rounded-lg border overflow-hidden w-full" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
+                      {/* Accordion Header */}
+                      <button
+                        onClick={() => toggleCategory(catName)}
+                        className="w-full px-3 py-2.5 flex items-center justify-between font-mono font-bold text-[13px] border-l-4 cursor-pointer hover:bg-var(--bg-secondary) transition-all text-left"
+                        style={{ borderLeftColor: color, backgroundColor: 'var(--bg-secondary)' }}
+                      >
+                        <div className="flex items-center gap-2 truncate min-w-0">
+                          <span style={{ color }}>{getCatIcon(catName)}</span>
+                          <span className="text-[0.95rem] text-[var(--text-primary)] truncate">{catName}</span>
+                          <span className="text-[11px] text-[var(--text-muted)] flex-shrink-0">({catIncidents.length})</span>
+                        </div>
+                        <span className="text-[12px] text-[var(--text-muted)] ml-2">{isExpanded ? '▲' : '▼'}</span>
+                      </button>
+
+                      {/* Accordion Content */}
+                      {isExpanded && (
+                        <div className="p-3 space-y-3 border-t border-[var(--border-secondary)] animate-slide-down w-full">
+                          {catIncidents.map(inc => {
+                            const activeColor = getCatColor(inc.category);
+                            return (
+                              <div key={inc.id} className="rounded-lg border p-3 space-y-2 transition-all duration-300 relative w-full overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-secondary)', borderLeftColor: activeColor, borderLeftWidth: 3 }}>
+                                {/* Pending Sync / Sync Error badge overlays */}
+                                {inc.pendingSync && (
+                                  <span className="absolute top-2.5 right-20 text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border border-cyan-500 text-cyan-500 bg-cyan-500/5 animate-pulse flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-ping" />
+                                    [ Pending Sync ]
+                                  </span>
+                                )}
+                                {inc.syncError && (
+                                  <button
+                                    onClick={() => handleRetrySync(inc.id)}
+                                    className="absolute top-2.5 right-20 text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border border-red-500 text-red-500 bg-red-500/5 animate-pulse cursor-pointer hover:bg-red-500/10 flex items-center gap-1"
+                                  >
+                                    <AlertCircle className="w-3 h-3" />
+                                    [ Sync Error: Tap to retry ]
+                                  </button>
+                                )}
+
+                                <div className="flex items-start justify-between gap-2 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                    <span style={{ color: activeColor }}>{getCatIcon(inc.category)}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-[0.95rem] font-bold text-[var(--text-primary)] truncate">{inc.category}</p>
+                                      <p className="text-[11px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                                        <MapPin className="w-2.5 h-2.5 inline mr-0.5"/>{inc.location}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <StatusBadge status={inc.status} />
+                                </div>
+                                <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">{inc.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-mono text-[var(--text-muted)]">{inc.timestamp}</span>
+                                  <button
+                                    onClick={() => { upvoteIncident(inc.id); updateKarma(2); }}
+                                    className="flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded border cursor-pointer hover:bg-white/5 transition-all"
+                                    style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}
+                                  >
+                                    <ThumbsUp className="w-2.5 h-2.5"/>
+                                    {inc.upvotes}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <StatusBadge status={inc.status} />
-                  </div>
-                  <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{inc.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>{inc.timestamp}</span>
-                    <button
-                      onClick={() => { upvoteIncident(inc.id); updateKarma(2); }}
-                      className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded border cursor-pointer hover:bg-white/5 transition-all"
-                      style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}
-                    >
-                      <ThumbsUp className="w-2.5 h-2.5"/>
-                      {inc.upvotes}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
 
         {/* ═══ REPORT TAB ═════════════════════════════════════════════════ */}
         {activeTab === 'report' && (
-          <div className="p-3 font-sans">
-            {/* Processing state */}
+          <div className="p-3 font-sans w-full">
+            {/* Form submission state checks */}
             {submitPhase === 'processing' && (
-              <div className="flex flex-col items-center justify-center min-h-[380px] space-y-6 animate-fade-in bg-var(--bg-primary)">
+              <div className="flex flex-col items-center justify-center min-h-[380px] space-y-6 animate-fade-in bg-var(--bg-primary) w-full">
                 <div className="w-12 h-12 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent-cyan)', borderTopColor: 'transparent' }} />
                 <div className="space-y-3 w-full max-w-[280px]">
                   {PROCESSING_STEPS.map((step, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${i < processingStep ? 'bg-green-500' : i === processingStep ? 'bg-cyan-500 animate-pulse' : 'bg-zinc-800'}`} />
-                      <span className="text-[10px] font-mono"
+                      <span className="text-[11px] font-mono"
                         style={{ color: i < processingStep ? '#16A34A' : i === processingStep ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
                         {step}
                       </span>
@@ -616,9 +839,45 @@ export const CitizenSimulator: React.FC = () => {
               </div>
             )}
 
-            {/* Success state */}
+            {/* Success state (renders ledger commit progress background workers) */}
             {submitPhase === 'success' && (
-              <div className="flex flex-col items-center justify-center min-h-[420px] space-y-5 text-center animate-fade-in p-4">
+              <div className="flex flex-col items-center justify-center min-h-[420px] space-y-5 text-center animate-fade-in p-4 w-full">
+                
+                {/* Background worker status panels inside the success tab */}
+                <div className="w-full max-w-[280px] p-3 rounded-lg border text-left" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
+                  <p className="text-[11px] font-mono uppercase tracking-wider font-bold mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-cyan)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                    Ledger Sync Status
+                  </p>
+                  
+                  <div className="space-y-2">
+                    {PROCESSING_STEPS.map((step, idx) => {
+                      const completed = idx < currentSync.step;
+                      const active = idx === currentSync.step && currentSync.status === 'syncing';
+                      const failed = idx === currentSync.step && currentSync.status === 'failed';
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-[11px] font-mono">
+                          <span style={{ color: completed ? 'var(--accent-green)' : active ? 'var(--accent-cyan)' : failed ? 'var(--accent-red)' : 'var(--text-muted)' }}>
+                            {step}
+                          </span>
+                          <span className="font-bold">
+                            {completed ? '✓ DONE' : active ? '○ SYNCING' : failed ? '🔴 FAILED' : '○ PENDING'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {currentSync.status === 'failed' && (
+                    <button
+                      onClick={() => handleRetrySync(generatedId)}
+                      className="w-full mt-3 py-1.5 rounded text-[11px] font-mono font-bold uppercase cursor-pointer border hover:bg-red-500/10 text-red-500 border-red-500/35"
+                    >
+                      Sync Failed: Tap to retry
+                    </button>
+                  )}
+                </div>
+
                 {/* Animated checkmark */}
                 <div className="w-20 h-20 rounded-full flex items-center justify-center relative bg-green-500/10 border-2 border-green-500/40">
                   <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -628,31 +887,31 @@ export const CitizenSimulator: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-green-500">
+                  <p className="text-[11px] font-mono font-bold uppercase tracking-widest text-green-500">
                     Ticket Registered Successfully
                   </p>
-                  <div className="text-xs font-black font-mono text-[var(--text-primary)] py-1.5 px-3 rounded-lg border bg-green-500/5 border-green-500/20">
+                  <div className="text-[0.95rem] font-black font-mono text-[var(--text-primary)] py-1.5 px-3 rounded-lg border bg-green-500/5 border-green-500/20">
                     {generatedId}
                   </div>
                 </div>
 
                 <div className="rounded-lg border p-3 space-y-2 w-full max-w-[280px] text-left"
                   style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
-                  <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
                     Your civic ticket has been successfully registered onto the Triage Ledger. Citizen tracking metrics updated.
                   </p>
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-green-600">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-green-600">
                     <Award className="w-3.5 h-3.5"/>
                     +10 Civic Karma points assigned
                   </div>
-                  <div className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  <div className="text-[11px] font-mono text-[var(--text-muted)]">
                     Status: <span className="text-amber-500 font-bold">TRIAGE</span> → Pending admin authorization
                   </div>
                 </div>
 
                 <button
                   onClick={resetForm}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider cursor-pointer transition-all bg-green-500 text-white hover:brightness-105 shadow-md"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold font-mono text-[11px] uppercase tracking-wider cursor-pointer transition-all bg-green-500 text-white hover:brightness-105 shadow-md w-full max-w-[280px] justify-center"
                 >
                   <RotateCcw className="w-3.5 h-3.5"/>
                   Return to Citizen Console
@@ -660,56 +919,56 @@ export const CitizenSimulator: React.FC = () => {
               </div>
             )}
 
-            {/* Form state */}
+            {/* Form input interface */}
             {submitPhase === 'form' && (
-              <div className="space-y-4">
+              <div className="space-y-4 w-full">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">File Civic Report</h3>
-                  <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  <h3 className="text-[1.25rem] font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">File Civic Report</h3>
+                  <span className="text-[11px] font-mono text-[var(--text-muted)]">
                     📍 GPS Ready
                   </span>
                 </div>
 
                 {/* Simulated Preset Cards */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Simulated Preset Evidence</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Simulated Preset Evidence</label>
+                  <div className="grid grid-cols-3 gap-2 w-full">
                     <button
                       type="button"
                       onClick={() => selectPreset('pothole')}
-                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card) min-w-0"
                       style={{ borderColor: activeScene === 'pothole' ? '#FFCC00' : 'var(--border-secondary)', backgroundColor: activeScene === 'pothole' ? 'rgba(255,204,0,0.06)' : 'var(--bg-card)' }}
                     >
-                      <Construction className="w-4 h-4 text-[#FFCC00]" />
-                      <div>
-                        <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Pothole Scene</p>
-                        <p className="text-[7.5px] text-zinc-550">Asphalt Fracture</p>
+                      <Construction className="w-4 h-4 text-[#FFCC00] flex-shrink-0" />
+                      <div className="min-w-0 w-full truncate">
+                        <p className="text-[11px] font-bold text-[var(--text-primary)] leading-tight truncate">[ Pothole ]</p>
+                        <p className="text-[9px] text-zinc-550 truncate">Asphalt</p>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => selectPreset('water')}
-                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card) min-w-0"
                       style={{ borderColor: activeScene === 'water' ? '#38BDF8' : 'var(--border-secondary)', backgroundColor: activeScene === 'water' ? 'rgba(56,189,248,0.06)' : 'var(--bg-card)' }}
                     >
-                      <Droplets className="w-4 h-4 text-[#38BDF8]" />
-                      <div>
-                        <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Water Burst</p>
-                        <p className="text-[7.5px] text-zinc-550">Hydro Leak</p>
+                      <Droplets className="w-4 h-4 text-[#38BDF8] flex-shrink-0" />
+                      <div className="min-w-0 w-full truncate">
+                        <p className="text-[11px] font-bold text-[var(--text-primary)] leading-tight truncate">[ Water Leak ]</p>
+                        <p className="text-[9px] text-zinc-550 truncate">Hydro Burst</p>
                       </div>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => selectPreset('utility')}
-                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
-                      style={{ borderColor: activeScene === 'utility' ? '#FF3B30' : 'var(--border-secondary)', backgroundColor: activeScene === 'utility' ? 'rgba(255,59,48,0.06)' : 'var(--bg-card)' }}
+                      onClick={() => selectPreset('sanitation')}
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card) min-w-0"
+                      style={{ borderColor: activeScene === 'sanitation' ? '#EAB308' : 'var(--border-secondary)', backgroundColor: activeScene === 'sanitation' ? 'rgba(234,179,8,0.06)' : 'var(--bg-card)' }}
                     >
-                      <Zap className="w-4 h-4 text-[#FF3B30]" />
-                      <div>
-                        <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Utility Spark</p>
-                        <p className="text-[7.5px] text-zinc-550">Grid Danger</p>
+                      <Trash2 className="w-4 h-4 text-[#EAB308] flex-shrink-0" />
+                      <div className="min-w-0 w-full truncate">
+                        <p className="text-[11px] font-bold text-[var(--text-primary)] leading-tight truncate">[ Sanitation ]</p>
+                        <p className="text-[9px] text-zinc-550 truncate">Overspill</p>
                       </div>
                     </button>
                   </div>
@@ -717,52 +976,65 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Geolocation Telemetry */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Paired GPS Telemetry</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Paired GPS Telemetry</label>
                   <div className="flex gap-2">
-                    <div className="flex-1 p-2 rounded border font-mono text-[10px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
-                      <span className="text-[8px] text-[var(--text-muted)] uppercase block">Latitude</span>
+                    <div className="flex-1 p-2 rounded border font-mono text-[11px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
+                      <span className="text-[9px] text-[var(--text-muted)] uppercase block">Latitude</span>
                       <span className="font-bold">{geoCoords.lat.toFixed(5)}° N</span>
                     </div>
-                    <div className="flex-1 p-2 rounded border font-mono text-[10px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
-                      <span className="text-[8px] text-[var(--text-muted)] uppercase block">Longitude</span>
+                    <div className="flex-1 p-2 rounded border font-mono text-[11px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
+                      <span className="text-[9px] text-[var(--text-muted)] uppercase block">Longitude</span>
                       <span className="font-bold">{geoCoords.lng.toFixed(5)}° E</span>
                     </div>
                   </div>
-                  <div className="p-2.5 rounded border text-[10px] font-mono bg-var(--bg-secondary)" style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
-                    <span className="text-[8px] uppercase block mb-0.5">Automated Address Matrix</span>
+                  <div className="p-2.5 rounded border text-[11px] font-mono bg-var(--bg-secondary)" style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
+                    <span className="text-[9px] uppercase block mb-0.5">Automated Address Matrix</span>
                     <span className="font-bold text-[var(--text-primary)]">{addressString}</span>
                   </div>
                 </div>
 
-                {/* Visual Evidence Canvas HUD */}
+                {/* Visual Evidence Canvas / Video HUD wrapper */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Visual Evidence Screen</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold flex items-center justify-between">
+                    <span>Visual Evidence Screen</span>
+                    {mediaMode !== 'idle' && (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded animate-pulse border bg-emerald-500/5 text-emerald-500 border-emerald-500/35">
+                        [ HARDWARE EMULATED ]
+                      </span>
+                    )}
+                  </label>
+                  
                   {!cameraActive ? (
                     <button type="button" onClick={activateCamera}
                       className="w-full py-4 rounded-lg border border-dashed flex flex-col items-center gap-1.5 cursor-pointer transition-all hover:bg-white/5 bg-var(--bg-card)"
                       style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
                       <Camera className="w-5 h-5 animate-pulse text-[var(--accent-cyan)]" />
-                      <span className="text-[9px] font-mono">Connect Hardware Camera</span>
+                      <span className="text-[11px] font-mono">Connect Hardware Camera</span>
                     </button>
                   ) : (
                     <div className="space-y-2">
                       <div className="relative rounded-lg overflow-hidden border" style={{ height: '140px', backgroundColor: '#060B0C', borderColor: 'var(--border-secondary)' }}>
                         {scanningScene && (
                           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-                            <div className="text-[10px] font-mono animate-pulse text-[var(--accent-cyan)]">
+                            <div className="text-[11px] font-mono animate-pulse text-[var(--accent-cyan)]">
                               ▶ SCANNING VISUAL SCENE EVIDENCE...
                             </div>
                           </div>
                         )}
-                        <canvas ref={cameraCanvasRef} width={300} height={140} className="w-full h-full" />
+                        
+                        {mediaMode === 'live' ? (
+                          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                        ) : (
+                          <canvas ref={cameraCanvasRef} width={300} height={140} className="w-full h-full" />
+                        )}
                         
                         {visionScanText && !scanningScene && (
-                          <div className="absolute bottom-2 left-2 right-2 p-1.5 rounded bg-black/75 border border-[#00FFCC]/20 text-[8.5px] font-mono text-[#00FFCC] text-center shadow-lg animate-fade-in">
+                          <div className="absolute bottom-2 left-2 right-2 p-1.5 rounded bg-black/75 border border-[#00FFCC]/20 text-[9px] font-mono text-[#00FFCC] text-center shadow-lg animate-fade-in">
                             {visionScanText}
                           </div>
                         )}
 
-                        <button type="button" onClick={() => { setCameraActive(false); setActiveScene(null); setVisionScanText(''); }}
+                        <button type="button" onClick={() => { setCameraActive(false); setActiveScene(null); setVisionScanText(''); setMediaMode('idle'); }}
                           className="absolute top-2 right-2 p-1 rounded bg-black/60 cursor-pointer text-white" style={{ color: '#64748B' }}>
                           <X className="w-3.5 h-3.5"/>
                         </button>
@@ -773,14 +1045,14 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Category selection */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Category</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">Category</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {CATEGORIES.map(cat => (
                       <button
                         key={cat.label}
                         type="button"
                         onClick={() => setReportCategory(cat.label)}
-                        className="flex items-center gap-1.5 p-2 rounded-lg border text-left cursor-pointer transition-all"
+                        className="flex items-center gap-1.5 p-2 rounded-lg border text-left cursor-pointer transition-all min-w-0"
                         style={{
                           borderColor: reportCategory === cat.label ? cat.color : 'var(--border-secondary)',
                           backgroundColor: reportCategory === cat.label ? `${cat.color}12` : 'var(--bg-card)',
@@ -788,7 +1060,7 @@ export const CitizenSimulator: React.FC = () => {
                         }}
                       >
                         {cat.icon}
-                        <span className="text-[9px] font-mono font-bold leading-tight">{cat.label}</span>
+                        <span className="text-[11px] font-mono font-bold leading-tight truncate">{cat.label}</span>
                       </button>
                     ))}
                   </div>
@@ -796,14 +1068,14 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Severity */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Severity</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">Severity</label>
                   <div className="flex gap-2">
                     {(['Critical', 'Moderate', 'Low'] as const).map(sev => {
                       const cols = { Critical: '#FF3B30', Moderate: '#FFCC00', Low: '#22C55E' };
                       const active = reportSeverity === sev;
                       return (
                         <button key={sev} type="button" onClick={() => setReportSeverity(sev)}
-                          className="flex-1 py-1.5 rounded border text-[10px] font-mono font-bold cursor-pointer transition-all"
+                          className="flex-1 py-1.5 rounded border text-[11px] font-mono font-bold cursor-pointer transition-all"
                           style={{ borderColor: active ? cols[sev] : 'var(--border-secondary)', backgroundColor: active ? `${cols[sev]}12` : 'var(--bg-card)', color: active ? cols[sev] : 'var(--text-muted)' }}>
                           {sev}
                         </button>
@@ -814,24 +1086,24 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Location */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Location / Telemetry Chips Coordinates</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Location / Telemetry Chips Coordinates</label>
                   <input
                     value={reportLocation}
                     onChange={e => setReportLocation(e.target.value)}
-                    className="w-full rounded-lg border px-3 py-2 text-[10px] font-mono bg-transparent text-[var(--text-primary)] outline-none"
+                    className="w-full rounded-lg border px-3 py-2 text-[11px] font-mono bg-transparent text-[var(--text-primary)] outline-none"
                     style={{ borderColor: 'var(--border-secondary)' }}
                   />
                 </div>
 
                 {/* Audio + Translation */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Audio Note + Localization</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Audio Note + Localization</label>
 
                   <div className="relative">
                     <select
                       value={selectedLanguage}
                       onChange={e => setSelectedLanguage(e.target.value)}
-                      className="w-full rounded-lg border px-3 py-2 text-[10px] font-mono bg-transparent text-[var(--text-primary)] outline-none appearance-none cursor-pointer"
+                      className="w-full rounded-lg border px-3 py-2 text-[11px] font-mono bg-transparent text-[var(--text-primary)] outline-none appearance-none cursor-pointer"
                       style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}
                     >
                       {LANGUAGES.map(l => <option key={l} value={l} style={{ backgroundColor: 'var(--bg-card)' }}>{l}</option>)}
@@ -856,22 +1128,22 @@ export const CitizenSimulator: React.FC = () => {
                                 style={{ minHeight: '4px' }} />
                             ))}
                           </div>
-                          <span className="text-[10px] font-mono text-[var(--text-primary)]">
+                          <span className="text-[11px] font-mono text-[var(--text-primary)]">
                             {String(Math.floor(recordingTime/60)).padStart(2,'0')}:{String(recordingTime%60).padStart(2,'0')}
                           </span>
-                          <span className="text-[9px] font-mono text-red-500">Stop</span>
+                          <span className="text-[10px] font-mono text-red-500">Stop</span>
                         </>
                       ) : (
                         <>
-                          <Mic className="w-4 h-4 text-[var(--accent-cyan)]" />
-                          <span className="text-[10px] font-mono text-[var(--text-muted)]">Record Audio Note ({selectedLanguage})</span>
+                          <Mic className="w-4 h-4 text-[var(--accent-cyan)] flex-shrink-0" />
+                          <span className="text-[11px] font-mono text-[var(--text-muted)]">Record Audio Note ({selectedLanguage})</span>
                         </>
                       )}
                     </button>
                   ) : (
                     <div className="flex items-center gap-2 py-2 px-3 rounded-lg border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'rgba(0,255,204,0.04)' }}>
                       <div className="w-3.5 h-3.5 rounded-full animate-spin border border-t-transparent border-cyan-500" />
-                      <span className="text-[10px] font-mono animate-pulse text-cyan-600">
+                      <span className="text-[11px] font-mono animate-pulse text-cyan-600">
                         Localizing {selectedLanguage} → EN-US Translation...
                       </span>
                     </div>
@@ -879,10 +1151,10 @@ export const CitizenSimulator: React.FC = () => {
 
                   {transcriptText && (
                     <div className="rounded-lg border p-2.5 space-y-1.5 bg-green-500/5 border-green-500/20">
-                      <p className="text-[9px] font-mono font-bold text-green-600">Translated Observational Transcript:</p>
-                      <p className="text-[10px] leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">{transcriptText.split('\n\n')[0]}</p>
+                      <p className="text-[11px] font-mono font-bold text-green-600">Translated Observational Transcript:</p>
+                      <p className="text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">{transcriptText.split('\n\n')[0]}</p>
                       {languageBadge && (
-                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border inline-block bg-cyan-500/5 border-cyan-500/20 text-cyan-600">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border inline-block bg-cyan-500/5 border-cyan-500/20 text-cyan-600">
                           🌐 SOURCE: {languageBadge.toUpperCase()} → EN-US | ACCURACY: 99.1%
                         </span>
                       )}
@@ -892,13 +1164,13 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Description textarea */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Observational Notes</label>
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Observational Notes</label>
                   <textarea
                     value={reportNotes}
                     onChange={e => setReportNotes(e.target.value)}
                     rows={3}
                     placeholder="Describe the issue in detail or use presets..."
-                    className="w-full rounded-lg border px-3 py-2 text-[10px] font-mono bg-transparent text-[var(--text-primary)] outline-none resize-none"
+                    className="w-full rounded-lg border px-3 py-2 text-[11px] font-mono bg-transparent text-[var(--text-primary)] outline-none resize-none"
                     style={{ borderColor: 'var(--border-secondary)' }}
                   />
                 </div>
@@ -908,9 +1180,9 @@ export const CitizenSimulator: React.FC = () => {
                   type="button"
                   onClick={handleSubmit}
                   disabled={!reportNotes && !transcriptText}
-                  className="w-full py-3 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-[var(--accent-cyan)] text-[var(--bg-primary)] hover:brightness-105 shadow-lg"
+                  className="w-full py-3 rounded-xl font-bold font-mono text-[11px] uppercase tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-[var(--accent-cyan)] text-[var(--bg-primary)] hover:brightness-105 shadow-lg"
                 >
-                  <PlusCircle className="w-4 h-4"/>
+                  <PlusCircle className="w-4 h-4 flex-shrink-0"/>
                   File Civic Report
                 </button>
               </div>
@@ -920,24 +1192,24 @@ export const CitizenSimulator: React.FC = () => {
 
         {/* ═══ KARMA LEDGER TAB ═══════════════════════════════════════════ */}
         {activeTab === 'ledger' && (
-          <div className="p-3 space-y-4">
+          <div className="p-3 space-y-4 w-full">
             {/* XP summary card */}
-            <div className="rounded-xl border p-4 transition-all duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+            <div className="rounded-xl border p-4 transition-all duration-300 w-full" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Civic Karma Balance</p>
-                  <p className="text-3xl font-black font-mono mt-1 text-[var(--accent-cyan)]">
+                  <p className="text-[11px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Civic Karma Balance</p>
+                  <p className="text-[1.875rem] font-black font-mono mt-1 text-[var(--accent-cyan)]">
                     {session?.karmaXP || 0} <span className="text-sm font-bold">XP</span>
                   </p>
                 </div>
-                <div className="w-14 h-14 rounded-full border-2 flex items-center justify-center" style={{ borderColor: 'var(--accent-cyan)', backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="w-14 h-14 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: 'var(--accent-cyan)', backgroundColor: 'var(--bg-secondary)' }}>
                   <Award className="w-7 h-7 text-[var(--accent-cyan)]" />
                 </div>
               </div>
               
               {/* XP bar */}
               <div className="mt-3 space-y-1">
-                <div className="flex justify-between text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                <div className="flex justify-between text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
                   <span>Progress to next badge</span>
                   <span style={{ color: 'var(--accent-cyan)' }}>{session?.karmaXP || 0} / 400 XP</span>
                 </div>
@@ -950,7 +1222,7 @@ export const CitizenSimulator: React.FC = () => {
               {session?.badges && session.badges.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {session.badges.map(badge => (
-                    <span key={badge} className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border bg-[var(--accent-cyan)]/5 border-[var(--accent-cyan)]/25 text-[var(--accent-cyan)]">
+                    <span key={badge} className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border bg-[var(--accent-cyan)]/5 border-[var(--accent-cyan)]/25 text-[var(--accent-cyan)]">
                       🏅 {badge}
                     </span>
                   ))}
@@ -958,32 +1230,34 @@ export const CitizenSimulator: React.FC = () => {
               )}
             </div>
 
-            {/* Transaction history */}
-            <div className="space-y-2">
-              <h4 className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Karma Ledger History</h4>
+            {/* Transaction history in clean list form */}
+            <div className="space-y-2 w-full">
+              <h4 className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-muted)]">Karma Ledger History</h4>
               {karmaTransactions.length === 0 ? (
-                <p className="text-[10px] font-mono text-center py-6" style={{ color: 'var(--text-muted)' }}>No transactions yet. File a report or confirm a resolution to earn XP.</p>
+                <p className="text-[11px] font-mono text-center py-6" style={{ color: 'var(--text-muted)' }}>No transactions yet. File a report or confirm a resolution to earn XP.</p>
               ) : (
-                karmaTransactions.map(tx => (
-                  <div key={tx.id} className="flex items-center justify-between rounded border p-2.5" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
-                    <div>
-                      <p className="text-[10px] font-mono text-[var(--text-primary)]">{tx.msg}</p>
-                      <p className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>{tx.time}</p>
+                <div className="flex flex-col gap-2 w-full">
+                  {karmaTransactions.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between rounded border p-2.5 w-full" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+                      <div className="min-w-0">
+                        <p className="text-[0.95rem] font-mono text-[var(--text-primary)] truncate">{tx.msg}</p>
+                        <p className="text-[11px] font-mono text-[var(--text-muted)]">{tx.time}</p>
+                      </div>
+                      <span className="text-[1.15rem] font-black font-mono text-[var(--accent-cyan)] ml-2 flex-shrink-0">{tx.xp}</span>
                     </div>
-                    <span className="text-[11px] font-black font-mono text-[var(--accent-cyan)]">{tx.xp}</span>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Trust matrix */}
+            {/* Trust Matrix Grades (stacked layout implemented responsively) */}
             <MunicipalTrustMatrix sectorGrades={sectorGrades} trustScore={trustScore} />
           </div>
         )}
       </div>
 
       {/* ── Bottom tab bar ── */}
-      <div className="border-t grid grid-cols-3 h-14" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
+      <div className="border-t grid grid-cols-3 h-14 flex-shrink-0" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
         {([
           { key: 'feed', label: 'Live Feed', icon: <Clock className="w-4 h-4"/> },
           { key: 'report', label: 'Report', icon: <Camera className="w-4 h-4"/> },
@@ -994,7 +1268,7 @@ export const CitizenSimulator: React.FC = () => {
             className="flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all"
             style={{ color: activeTab === tab.key ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
             {tab.icon}
-            <span className="text-[9px] font-mono uppercase font-bold tracking-widest">{tab.label}</span>
+            <span className="text-[11px] font-mono uppercase font-bold tracking-widest">{tab.label}</span>
             {activeTab === tab.key && <div className="w-4 h-0.5 rounded-full mt-0.5" style={{ backgroundColor: 'var(--accent-cyan)' }} />}
           </button>
         ))}

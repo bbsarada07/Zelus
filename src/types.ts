@@ -63,6 +63,8 @@ export interface Incident {
   };
   resolvedAt?: number;
   dispatchedAt?: number;
+  pendingSync?: boolean;
+  syncError?: boolean;
 }
 
 export type UserRole = 'Admin' | 'Citizen' | 'Contractor';

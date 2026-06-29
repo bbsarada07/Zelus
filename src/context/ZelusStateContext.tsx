@@ -74,6 +74,7 @@ export interface ZelusState {
   updateStage: (id: string, stage: 'Accepted' | 'Dispatched' | 'In-Review') => void;
   submitProgress: (id: string, photo: string) => void;
   confirmResolution: (id: string, verification: { name: string; timestamp: string; photo: string }) => void;
+  updateIncidentSync: (id: string, pendingSync: boolean, syncError: boolean) => void;
 
   // Karma actions
   updateKarma: (xp: number) => void;
@@ -217,6 +218,10 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   }, [setIncidents, addToast, fireWebhook]);
 
+  const updateIncidentSync = useCallback((id: string, pendingSync: boolean, syncError: boolean) => {
+    setIncidents(p => p.map(i => i.id === id ? { ...i, pendingSync, syncError } : i));
+  }, [setIncidents]);
+
   const updateKarma = useCallback((xp: number) => {
     if (!session) return;
     const newXP = session.karmaXP + xp;
@@ -271,7 +276,7 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     incidents, bounties, webhookLogs, session, theme, trustScore, sectorGrades, toasts, isIsolated,
     setSession, setTheme, toggleTheme, toggleIsolation,
     addIncident, upvoteIncident, authorizeDispatch, claimBounty, updateStage, submitProgress, confirmResolution,
-    updateKarma, addToast, dismissToast,
+    updateIncidentSync, updateKarma, addToast, dismissToast,
   };
 
   return <ZelusStateContext.Provider value={value}>{children}</ZelusStateContext.Provider>;

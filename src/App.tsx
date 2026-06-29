@@ -7,6 +7,7 @@ import { MobileViewport } from './components/MobileViewport';
 import { CitizenSimulator } from './components/CitizenSimulator';
 import { GovernmentDashboard } from './components/GovernmentDashboard';
 import { ContractorDashboard } from './components/ContractorDashboard';
+import { MockSearchEngine } from './components/MockSearchEngine';
 import type { UserRole } from './types';
 
 // ── Toast Layer ───────────────────────────────────────────────────────────
@@ -24,11 +25,29 @@ const ToastLayer: React.FC = () => {
         }[toast.type];
         const { bg, border, color, Icon } = colors;
         return (
-          <div key={toast.id} className="flex items-center gap-3 rounded-xl border px-3 py-2.5 animate-toast-in shadow-2xl backdrop-blur-md"
-            style={{ backgroundColor: bg, borderColor: border }}>
+          <div 
+            key={toast.id} 
+            onClick={() => {
+              if (toast.message.toLowerCase().includes('sync error') || toast.message.toLowerCase().includes('retry')) {
+                window.dispatchEvent(new CustomEvent('zelus-retry-sync', { detail: { id: toast.id } }));
+                dismissToast(toast.id);
+              }
+            }}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 animate-toast-in shadow-2xl backdrop-blur-md ${
+              (toast.message.toLowerCase().includes('sync error') || toast.message.toLowerCase().includes('retry')) ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : ''
+            }`}
+            style={{ backgroundColor: bg, borderColor: border }}
+          >
             <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} />
-            <p className="text-xs font-mono flex-1" style={{ color: 'rgba(255,255,255,0.9)' }}>{toast.message}</p>
-            <button onClick={() => dismissToast(toast.id)} className="cursor-pointer flex-shrink-0" style={{ color: '#64748B' }}>
+            <p className="text-xs font-mono flex-1 text-white">{toast.message}</p>
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                dismissToast(toast.id); 
+              }} 
+              className="cursor-pointer flex-shrink-0" 
+              style={{ color: '#64748B' }}
+            >
               <X className="w-3.5 h-3.5"/>
             </button>
           </div>
@@ -42,6 +61,13 @@ const ToastLayer: React.FC = () => {
 const AppShell: React.FC = () => {
   const { session, setSession, theme, toggleTheme } = useZelus();
   const [booting, setBooting] = useState(true);
+  const [appView, setAppView] = useState<'search' | 'app'>(() => {
+    const hasSession = localStorage.getItem('zelus_session');
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    if (hasSession || roleParam) return 'app';
+    return 'search';
+  });
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -51,6 +77,7 @@ const AppShell: React.FC = () => {
       const initialXP = roleParam === 'Citizen' ? 120 : roleParam === 'Contractor' ? 150 : 0;
       const badges = roleParam === 'Citizen' ? ['Water Watcher'] : roleParam === 'Contractor' ? ['Vetted Contractor'] : ['System Admin'];
       setSession({ username, role: roleParam, karmaXP: initialXP, badges });
+      setAppView('app');
       
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
@@ -63,7 +90,10 @@ const AppShell: React.FC = () => {
     setSession({ username, role, karmaXP: initialXP, badges });
   };
 
-  const handleLogout = () => setSession(null);
+  const handleLogout = () => {
+    setSession(null);
+    setAppView('search');
+  };
 
   // Quick switch for demo (same as login but inline)
   const switchRole = (role: UserRole) => {
@@ -76,6 +106,20 @@ const AppShell: React.FC = () => {
   }
 
   const isDark = theme === 'dark';
+
+  if (appView === 'search') {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <MockSearchEngine
+          onEnter={() => {
+            handleLogin('citizen_hero', 'Citizen');
+            setAppView('app');
+          }}
+        />
+        <ToastLayer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
