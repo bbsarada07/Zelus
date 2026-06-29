@@ -1,61 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Wifi, CheckCircle2, Cpu, Scan } from 'lucide-react';
+import QRCode from 'qrcode';
 
 interface QRPairingModalProps {
   onClose: () => void;
-}
-
-// Draws a minimal-but-convincing QR code pattern on canvas
-function drawQR(canvas: HTMLCanvasElement) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const S = canvas.width;
-  ctx.fillStyle = '#090F10';
-  ctx.fillRect(0, 0, S, S);
-
-  const CELL = 8;
-  const PAD = 16;
-  const COLS = Math.floor((S - PAD * 2) / CELL);
-
-  // Seeded pseudo-random data pattern
-  const seed = (x: number, y: number) => {
-    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return n - Math.floor(n);
-  };
-
-  ctx.fillStyle = '#00FFCC';
-
-  // Draw data modules
-  for (let r = 0; r < COLS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const isCornerBlock =
-        (r < 7 && c < 7) || (r < 7 && c > COLS - 8) || (r > COLS - 8 && c < 7);
-      if (!isCornerBlock && seed(r, c) > 0.5) {
-        ctx.fillRect(PAD + c * CELL + 1, PAD + r * CELL + 1, CELL - 2, CELL - 2);
-      }
-    }
-  }
-
-  // Draw three finder pattern squares (top-left, top-right, bottom-left)
-  const drawFinder = (ox: number, oy: number) => {
-    ctx.fillStyle = '#00FFCC';
-    ctx.fillRect(ox, oy, CELL * 7, CELL * 7);
-    ctx.fillStyle = '#090F10';
-    ctx.fillRect(ox + CELL, oy + CELL, CELL * 5, CELL * 5);
-    ctx.fillStyle = '#00FFCC';
-    ctx.fillRect(ox + CELL * 2, oy + CELL * 2, CELL * 3, CELL * 3);
-  };
-
-  drawFinder(PAD, PAD);
-  drawFinder(S - PAD - CELL * 7, PAD);
-  drawFinder(PAD, S - PAD - CELL * 7);
-
-  // Border guides
-  ctx.strokeStyle = 'rgba(0,255,204,0.2)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.strokeRect(PAD - 4, PAD - 4, S - PAD * 2 + 8, S - PAD * 2 + 8);
-  ctx.setLineDash([]);
 }
 
 const DEVICE_META = [
@@ -70,14 +18,37 @@ const DEVICE_META = [
 type ScanState = 'idle' | 'scanning' | 'success';
 
 export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [laserPos, setLaserPos] = useState(0); // 0-100 percentage
+  const [qrSvg, setQrSvg] = useState<string>('');
+  
+  // Dynamic URL pairing state
+  const [ipAddress, setIpAddress] = useState<string>(() => {
+    return window.location.hostname || 'localhost';
+  });
+  const [port, setPort] = useState<string>(() => {
+    return window.location.port || '5173';
+  });
 
-  // Draw QR on mount
+  const pairingUrl = `${window.location.protocol}//${ipAddress}${port ? `:${port}` : ''}/?role=Citizen`;
+
+  // Dynamic QR Code generation
   useEffect(() => {
-    if (canvasRef.current) drawQR(canvasRef.current);
-  }, []);
+    QRCode.toString(pairingUrl, {
+      type: 'svg',
+      margin: 1,
+      color: {
+        dark: '#00FFCC', // Neon teal
+        light: '#090F1000', // Transparent background
+      }
+    })
+    .then(svg => {
+      setQrSvg(svg);
+    })
+    .catch(err => {
+      console.error('Failed to generate QR Code:', err);
+    });
+  }, [pairingUrl]);
 
   // Laser animation loop
   useEffect(() => {
@@ -106,21 +77,21 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div
         className="w-full max-w-md relative rounded-2xl overflow-hidden shadow-2xl animate-fade-in border"
-        style={{ backgroundColor: 'rgba(9,15,16,0.98)', borderColor: 'rgba(0,255,204,0.3)' }}
+        style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'rgba(0,255,204,0.15)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-secondary)' }}>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(0,255,204,0.1)' }}>
               <Scan className="w-4 h-4" style={{ color: '#00FFCC' }} />
             </div>
             <div>
-              <h3 className="text-xs font-bold font-mono tracking-wider text-white uppercase">Sync Device Bridge</h3>
-              <p className="text-[9px] font-mono mt-0.5" style={{ color: '#64748B' }}>ZELUS Hardware Pairing Protocol v3.2</p>
+              <h3 className="text-xs font-bold font-mono tracking-wider text-[var(--text-primary)] uppercase">Sync Device Bridge</h3>
+              <p className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>ZELUS Hardware Pairing Protocol v3.2</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
-            <X className="w-4 h-4" style={{ color: '#64748B' }} />
+            <X className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
 
@@ -128,9 +99,41 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
 
           {scanState !== 'success' ? (
             <>
-              {/* QR Canvas */}
-              <div className="relative flex items-center justify-center rounded-xl overflow-hidden border"
-                style={{ backgroundColor: '#090F10', borderColor: 'rgba(0,255,204,0.2)', height: '240px' }}>
+              {/* URL Input Bridge Settings */}
+              <div className="p-3 rounded-lg border space-y-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+                <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--accent-cyan)]">Target Broadcast URL</p>
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8px] font-mono text-[var(--text-muted)] block uppercase">Local IP / Hostname</label>
+                    <input
+                      type="text"
+                      value={ipAddress}
+                      onChange={e => setIpAddress(e.target.value)}
+                      placeholder="e.g. 192.168.1.5"
+                      className="w-full rounded border px-2 py-1 text-[10px] font-mono bg-transparent text-[var(--text-primary)] outline-none"
+                      style={{ borderColor: 'var(--border-secondary)' }}
+                    />
+                  </div>
+                  <div className="w-20 space-y-1">
+                    <label className="text-[8px] font-mono text-[var(--text-muted)] block uppercase">Port</label>
+                    <input
+                      type="text"
+                      value={port}
+                      onChange={e => setPort(e.target.value)}
+                      placeholder="5173"
+                      className="w-full rounded border px-2 py-1 text-[10px] font-mono bg-transparent text-[var(--text-primary)] outline-none"
+                      style={{ borderColor: 'var(--border-secondary)' }}
+                    />
+                  </div>
+                </div>
+                <div className="text-[8.5px] font-mono text-[var(--text-muted)] break-all border-t pt-1.5" style={{ borderColor: 'var(--border-secondary)' }}>
+                  Enclosing target: <span className="text-[var(--accent-cyan)] font-bold">{pairingUrl}</span>
+                </div>
+              </div>
+
+              {/* QR Canvas Container */}
+              <div className="relative flex items-center justify-center rounded-xl overflow-hidden border p-4 bg-[#090F10]"
+                style={{ borderColor: 'var(--border-secondary)', height: '240px' }}>
 
                 {/* Corner markers */}
                 {['top-2 left-2', 'top-2 right-2', 'bottom-2 left-2', 'bottom-2 right-2'].map((pos, i) => (
@@ -140,12 +143,14 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
                   </div>
                 ))}
 
-                <canvas
-                  ref={canvasRef}
-                  width={200}
-                  height={200}
-                  className="relative z-10"
-                />
+                {qrSvg ? (
+                  <div 
+                    className="w-48 h-48 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+                    dangerouslySetInnerHTML={{ __html: qrSvg }}
+                  />
+                ) : (
+                  <div className="text-[10px] font-mono text-zinc-500">Generating SVG QR Code...</div>
+                )}
 
                 {/* Laser line */}
                 {scanState === 'scanning' && (
@@ -161,8 +166,8 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
 
                 {/* Idle overlay */}
                 {scanState === 'idle' && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-end pb-3 z-20">
-                    <p className="text-[9px] font-mono text-center animate-pulse" style={{ color: '#00FFCC' }}>
+                  <div className="absolute inset-0 flex flex-col items-center justify-end pb-1.5 z-20">
+                    <p className="text-[9px] font-mono text-center animate-pulse text-[#00FFCC]">
                       AWAITING LASER INITIALIZATION...
                     </p>
                   </div>
@@ -171,7 +176,7 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
                 {/* Scanning overlay */}
                 {scanState === 'scanning' && (
                   <div className="absolute bottom-2 left-0 right-0 flex justify-center z-20">
-                    <span className="text-[9px] font-mono animate-ticker" style={{ color: '#FF3B30' }}>
+                    <span className="text-[9px] font-mono animate-ticker text-[#FF3B30]">
                       ▶ SCANNING HANDSHAKE PROTOCOL...
                     </span>
                   </div>
@@ -179,7 +184,7 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
               </div>
 
               {/* Status row */}
-              <div className="flex items-center justify-between text-[9px] font-mono px-1" style={{ color: '#64748B' }}>
+              <div className="flex items-center justify-between text-[9px] font-mono px-1" style={{ color: 'var(--text-muted)' }}>
                 <span className="flex items-center gap-1.5">
                   <Cpu className="w-3 h-3" />
                   {scanState === 'scanning' ? 'SCANNING ACTIVE' : 'READY FOR SCAN'}
@@ -220,18 +225,18 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
                   <p className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: '#00FFCC' }}>
                     [ DEVICE PROTOCOL PAIRING LINK ESTABLISHED ]
                   </p>
-                  <p className="text-[9px] font-mono mt-1" style={{ color: '#64748B' }}>
+                  <p className="text-[9px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>
                     Secure encrypted channel active. Telemetry sync committed.
                   </p>
                 </div>
               </div>
 
               {/* Device metadata table */}
-              <div className="rounded-lg border divide-y overflow-hidden" style={{ borderColor: 'rgba(0,255,204,0.12)' }}>
+              <div className="rounded-lg border divide-y overflow-hidden" style={{ borderColor: 'var(--border-secondary)' }}>
                 {DEVICE_META.map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-center px-3 py-1.5 font-mono text-[9px]" style={{ borderColor: 'rgba(0,255,204,0.08)' }}>
-                    <span style={{ color: '#64748B' }}>{label}:</span>
-                    <span className="font-bold" style={{ color: '#00FFCC' }}>{value}</span>
+                  <div key={label} className="flex justify-between items-center px-3 py-1.5 font-mono text-[9px]" style={{ borderColor: 'var(--border-secondary)' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{label}:</span>
+                    <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
                   </div>
                 ))}
               </div>
@@ -239,7 +244,7 @@ export const QRPairingModal: React.FC<QRPairingModalProps> = ({ onClose }) => {
               <button
                 onClick={onClose}
                 className="w-full py-2 rounded-xl border font-mono text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all hover:bg-white/5"
-                style={{ borderColor: 'rgba(0,255,204,0.25)', color: '#64748B' }}
+                style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}
               >
                 Close Bridge Panel
               </button>

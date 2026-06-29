@@ -97,7 +97,7 @@ export interface DevLog {
   raw?: Record<string, unknown>;
 }
 
-export type MunicipalSector = 'Animal Care Services' | 'Sanitation Swarms' | 'Public Works Division' | 'Civil Mediation Squads';
+export type MunicipalSector = 'Animal Care Services' | 'Sanitation Swarms' | 'Public Works' | 'Civil Mediation Squads';
 
 export interface SectorGrade {
   sector: MunicipalSector;

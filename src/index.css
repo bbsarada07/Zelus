@@ -32,8 +32,8 @@
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-primary: #F4F6F6;
-  --bg-secondary: #FFFFFF;
+  --bg-primary: #F8F9FA;
+  --bg-secondary: #F1F3F5;
   --bg-card: #FFFFFF;
   --bg-card-raw: #FFFFFF;
   --border-primary: #0A46E4;
@@ -41,12 +41,43 @@
   --text-primary: #0F172A;
   --text-secondary: #0A46E4;
   --text-muted: #475569;
-  --accent-cyan: #05B375;
+  --accent-cyan: #0A46E4;
   --accent-amber: #D97706;
   --accent-red: #DC2626;
   --accent-red-hover: #B91C1C;
+  --accent-orange: #EA580C;
+  --accent-green: #16A34A;
+  --accent-yellow: #CA8A04;
+  --accent-purple: #7C3AED;
   --grid-line: rgba(10, 70, 228, 0.03);
 }
+
+/* ── Global Typography Scaling & Readability ─────────────── */
+.text-\[7px\], .text-\[7\.5px\], .text-\[8px\], .text-\[8\.5px\], .text-\[9px\], .text-\[9\.5px\] {
+  font-size: 12px !important;
+}
+.text-\[10px\], .text-\[11px\], .text-xs, .text-\[12px\], .text-\[13px\] {
+  font-size: 14px !important;
+}
+.text-sm, .text-\[14px\], .text-\[15px\] {
+  font-size: 15px !important;
+}
+.text-base, .text-\[16px\] {
+  font-size: 17px !important;
+}
+.text-lg {
+  font-size: 19px !important;
+}
+.text-xl {
+  font-size: 22px !important;
+}
+.text-2xl {
+  font-size: 26px !important;
+}
+.text-3xl {
+  font-size: 32px !important;
+}
+
 
 body {
   margin: 0;

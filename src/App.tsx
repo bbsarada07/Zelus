@@ -43,6 +43,20 @@ const AppShell: React.FC = () => {
   const { session, setSession, theme, toggleTheme } = useZelus();
   const [booting, setBooting] = useState(true);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    if (roleParam === 'Citizen' || roleParam === 'Admin' || roleParam === 'Contractor') {
+      const username = roleParam === 'Admin' ? 'admin_zero' : roleParam === 'Citizen' ? 'citizen_hero' : 'contractor_alpha';
+      const initialXP = roleParam === 'Citizen' ? 120 : roleParam === 'Contractor' ? 150 : 0;
+      const badges = roleParam === 'Citizen' ? ['Water Watcher'] : roleParam === 'Contractor' ? ['Vetted Contractor'] : ['System Admin'];
+      setSession({ username, role: roleParam, karmaXP: initialXP, badges });
+      
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [setSession]);
+
   const handleLogin = (username: string, role: UserRole) => {
     const initialXP = role === 'Citizen' ? 120 : role === 'Contractor' ? 150 : 0;
     const badges = role === 'Citizen' ? ['Water Watcher'] : role === 'Contractor' ? ['Vetted Contractor'] : ['System Admin'];
@@ -64,16 +78,16 @@ const AppShell: React.FC = () => {
   const isDark = theme === 'dark';
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
 
       {/* ── FIXED TOP HEADER STRIP (36px) ─────────────────────────────── */}
-      <header className="fixed top-0 left-0 right-0 z-[150] flex items-center justify-between px-4 border-b"
-        style={{ height: '36px', backgroundColor: '#090F10', borderColor: 'rgba(0,255,204,0.15)' }}>
+      <header className="fixed top-0 left-0 right-0 z-[150] flex items-center justify-between px-4 border-b transition-all duration-300"
+        style={{ height: '36px', backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
 
         {/* Left: Brand */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-black tracking-[0.25em] uppercase" style={{ color: '#00FFCC' }}>ZELUS</span>
-          <span className="hidden sm:flex text-[8px] font-mono" style={{ color: '#64748B' }}>// URBAN CIVIC ENGINE</span>
+          <span className="text-[10px] font-mono font-black tracking-[0.25em] uppercase" style={{ color: 'var(--accent-cyan)' }}>ZELUS</span>
+          <span className="hidden sm:flex text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>// URBAN CIVIC ENGINE</span>
         </div>
 
         {/* Center: Role switcher */}
@@ -92,9 +106,9 @@ const AppShell: React.FC = () => {
                   className="flex items-center gap-1 px-2.5 rounded text-[9px] font-mono font-bold transition-all cursor-pointer"
                   style={{
                     height: '22px',
-                    backgroundColor: isActive ? '#00FFCC' : 'transparent',
-                    color: isActive ? '#090F10' : '#64748B',
-                    border: isActive ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                    backgroundColor: isActive ? 'var(--accent-cyan)' : 'transparent',
+                    color: isActive ? 'var(--bg-primary)' : 'var(--text-muted)',
+                    border: isActive ? 'none' : '1px solid var(--border-secondary)',
                   }}
                 >
                   {icon}
@@ -111,19 +125,19 @@ const AppShell: React.FC = () => {
           <button onClick={toggleTheme} className="p-1 rounded cursor-pointer hover:bg-white/5 transition-colors"
             title="Toggle Theme">
             {isDark
-              ? <Sun className="w-3.5 h-3.5" style={{ color: '#64748B' }} />
-              : <Moon className="w-3.5 h-3.5" style={{ color: '#64748B' }} />}
+              ? <Sun className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+              : <Moon className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
           </button>
           {session && (
             <button onClick={handleLogout} className="flex items-center gap-1 px-2 rounded text-[9px] font-mono cursor-pointer hover:bg-red-500/10 transition-all"
-              style={{ color: '#64748B', height: '22px' }}>
+              style={{ color: 'var(--text-muted)', height: '22px' }}>
               <LogOut className="w-3 h-3"/>
               <span className="hidden sm:inline">Exit</span>
             </button>
           )}
           {!session && (
             <button onClick={() => {}} className="px-2 rounded text-[9px] font-mono cursor-pointer"
-              style={{ color: '#64748B', height: '22px' }}>
+              style={{ color: 'var(--text-muted)', height: '22px' }}>
               Access Portal
             </button>
           )}
@@ -142,7 +156,7 @@ const AppShell: React.FC = () => {
 
         {/* Citizen → Mobile viewport */}
         {session?.role === 'Citizen' && (
-          <div className="min-h-screen w-full flex items-center justify-center" style={{ backgroundColor: isDark ? '#040809' : '#EDEAE3' }}>
+          <div className="min-h-screen w-full flex items-center justify-center transition-all duration-300" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <MobileViewport theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} username={session.username}>
               <CitizenSimulator />
             </MobileViewport>
@@ -151,12 +165,12 @@ const AppShell: React.FC = () => {
 
         {/* Admin → Gov Dashboard */}
         {session?.role === 'Admin' && (
-          <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
+          <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full transition-all duration-300">
             {/* Weather ticker */}
             <div className="mb-4 py-1.5 px-4 rounded-lg border text-[9.5px] font-mono flex items-center justify-between"
-              style={{ backgroundColor: '#111A1C', borderColor: '#1A2629', color: '#64748B' }}>
+              style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
               <span>☀️ Environmental wear coefficient nominal. Autonomous swarm pre-warmed and standing by.</span>
-              <span className="flex items-center gap-1.5 text-[8.5px]" style={{ color: '#00FFCC' }}>
+              <span className="flex items-center gap-1.5 text-[8.5px]" style={{ color: 'var(--accent-cyan)' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping"/>
                 LEDGER SECURE
               </span>
@@ -167,16 +181,16 @@ const AppShell: React.FC = () => {
 
         {/* Contractor → Contractor Dashboard */}
         {session?.role === 'Contractor' && (
-          <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
-            <div className="mb-4 flex items-center justify-between border-b pb-3" style={{ borderColor: '#1A2629' }}>
+          <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full transition-all duration-300">
+            <div className="mb-4 flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-white">Volunteer Contractor Operations Command</h1>
-                <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)]">Volunteer Contractor Operations Command</h1>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                   Remediate local infrastructure failures, earn sponsorships, and verify repair completions.
                 </p>
               </div>
-              <div className="text-xs font-mono" style={{ color: '#64748B' }}>
-                Logged in as: <span style={{ color: '#00FFCC' }}>{session.username}</span>
+              <div className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                Logged in as: <span style={{ color: 'var(--accent-cyan)' }}>{session.username}</span>
               </div>
             </div>
             <ContractorDashboard />

@@ -5,19 +5,19 @@ import { initialIncidents, initialBounties } from '../mockData';
 // ── Sector mapping ─────────────────────────────────────────────────────────
 const SECTOR_CATEGORIES: Record<string, string> = {
   'Stray Animal Welfare & Rescue': 'Animal Care Services',
-  'Urban Forestry Protection': 'Public Works Division',
+  'Urban Forestry Protection': 'Public Works',
   'Sanitation Operations': 'Sanitation Swarms',
   'Neighborhood Mediation': 'Civil Mediation Squads',
-  'Road & Structural Damage': 'Public Works Division',
-  'Water Outage & Flooding': 'Public Works Division',
-  'Utility & Spark Hazard': 'Public Works Division',
+  'Road & Structural Damage': 'Public Works',
+  'Water Outage & Flooding': 'Public Works',
+  'Utility & Spark Hazard': 'Public Works',
 };
 
 function computeSectorGrades(incidents: Incident[]): SectorGrade[] {
-  const sectors = ['Animal Care Services', 'Sanitation Swarms', 'Public Works Division', 'Civil Mediation Squads'] as const;
+  const sectors = ['Animal Care Services', 'Sanitation Swarms', 'Public Works', 'Civil Mediation Squads'] as const;
   return sectors.map(sector => {
     const relevant = incidents.filter(i => {
-      const mapped = SECTOR_CATEGORIES[i.category] || 'Public Works Division';
+      const mapped = SECTOR_CATEGORIES[i.category] || 'Public Works';
       return mapped === sector;
     });
     const resolved = relevant.filter(i => i.status === 'Resolved');
@@ -103,11 +103,13 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>(() => loadLS('zelus_webhooks', []));
   const [session, setSessionRaw] = useState<UserSession | null>(() => loadLS('zelus_session', null));
   const [theme, setThemeRaw] = useState<Theme>(() => (loadLS('zelus_theme', 'dark') as Theme));
-  const [trustScore, setTrustScore] = useState<number>(() => loadLS('zelus_trust', 72));
   const [isIsolated, setIsIsolated] = useState(false);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   const sectorGrades = computeSectorGrades(incidents);
+  const resolvedCount = incidents.filter(i => i.status === 'Resolved').length;
+  const activeCount = incidents.filter(i => i.status !== 'Resolved').length;
+  const trustScore = Math.max(30, Math.min(100, Math.round(80 + (resolvedCount * 5) - (activeCount * 1.2))));
 
   // Persist to localStorage
   const setIncidents = useCallback((upd: Incident[] | ((prev: Incident[]) => Incident[])) => {
@@ -204,12 +206,7 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const resolved = updated.length >= 3;
       if (resolved) {
         const now = Date.now();
-        setTrustScore(prev => {
-          const next = Math.min(100, prev + 2);
-          localStorage.setItem('zelus_trust', JSON.stringify(next));
-          return next;
-        });
-        addToast(`✅ Incident ${id} resolved! Trust Score +2%`, 'success');
+        addToast(`✅ Incident ${id} resolved! Dynamic Trust updated.`, 'success');
         setTimeout(() => {
           fireWebhook(id, 'POST', 'Twilio SMS Dispatch', 200, { body: `Consensus reached. ${id} marked RESOLVED.` });
           fireWebhook(id, 'PUSH', 'Municipal GIS Map Service', 201, { id, status: 'Resolved' });

@@ -18,7 +18,7 @@ const SECTOR_META: Record<MunicipalSector, { icon: React.ReactNode; color: strin
     color: '#EAB308',
     bg: 'rgba(234,179,8,0.08)',
   },
-  'Public Works Division': {
+  'Public Works': {
     icon: <Trees className="w-4 h-4" />,
     color: '#22C55E',
     bg: 'rgba(34,197,94,0.08)',
@@ -57,14 +57,14 @@ const TrustGauge: React.FC<{ score: number }> = ({ score }) => {
     }
   }, [offset]);
 
-  const color = score >= 80 ? '#00FFCC' : score >= 60 ? '#FFCC00' : '#FF3B30';
+  const color = score >= 80 ? 'var(--accent-green)' : score >= 60 ? 'var(--accent-amber)' : 'var(--accent-red)';
 
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative w-24 h-24">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
           {/* Track */}
-          <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+          <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="var(--border-secondary)" strokeWidth="8" />
           {/* Progress arc */}
           <circle
             ref={svgRef}
@@ -82,13 +82,13 @@ const TrustGauge: React.FC<{ score: number }> = ({ score }) => {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-black font-mono" style={{ color }}>{score}%</span>
-          <span className="text-[7px] font-mono uppercase tracking-wider" style={{ color: '#64748B' }}>TRUST</span>
+          <span className="text-xl font-black font-mono text-[var(--text-primary)]">{score}%</span>
+          <span className="text-[7.5px] font-mono uppercase tracking-wider text-[var(--text-muted)]">TRUST</span>
         </div>
       </div>
       <div className="text-center">
-        <p className="text-[9px] font-mono uppercase tracking-wider text-white font-bold">City-Wide Trust Coefficient</p>
-        <p className="text-[8px] font-mono mt-0.5" style={{ color: '#64748B' }}>
+        <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-primary)] font-bold">City-Wide Trust Coefficient</p>
+        <p className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
           {score >= 80 ? '✅ Public confidence: HIGH' : score >= 60 ? '⚠️ Public confidence: MODERATE' : '🔴 Public confidence: LOW'}
         </p>
       </div>
@@ -99,24 +99,24 @@ const TrustGauge: React.FC<{ score: number }> = ({ score }) => {
 export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sectorGrades, trustScore }) => {
   return (
     <div
-      className="rounded-xl border p-5 space-y-5"
-      style={{ backgroundColor: '#0D1517', borderColor: 'rgba(0,255,204,0.12)' }}
+      className="rounded-xl border p-5 space-y-5 transition-all duration-300"
+      style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'rgba(0,255,204,0.1)' }}>
+      <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4" style={{ color: '#00FFCC' }} />
+          <ShieldCheck className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
           <div>
-            <h3 className="text-xs font-bold font-mono tracking-wider text-white uppercase">
+            <h3 className="text-xs font-bold font-mono tracking-wider text-[var(--text-primary)] uppercase">
               Municipal Sector Trust Matrix
             </h3>
-            <p className="text-[9px] font-mono mt-0.5" style={{ color: '#64748B' }}>
+            <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
               Performance Gradeboard & SLA Resolution Compliance
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[8px] font-mono border px-2 py-1 rounded-full"
-          style={{ borderColor: 'rgba(0,255,204,0.2)', color: '#00FFCC', backgroundColor: 'rgba(0,255,204,0.05)' }}>
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono border px-2 py-1 rounded-full"
+          style={{ borderColor: 'var(--border-secondary)', color: 'var(--accent-cyan)', backgroundColor: 'var(--bg-secondary)' }}>
           <TrendingUp className="w-3 h-3" />
           LIVE SLA FEED
         </div>
@@ -126,14 +126,14 @@ export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sect
         {/* 4 Sector Cards */}
         <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {sectorGrades.map(sg => {
-            const meta = SECTOR_META[sg.sector as MunicipalSector];
+            const meta = SECTOR_META[sg.sector as MunicipalSector] || SECTOR_META['Public Works'];
             const cls = gradeClass(sg.grade);
             const glow = gradeGlow(sg.grade);
             return (
               <div
                 key={sg.sector}
-                className="rounded-lg p-3 border space-y-2.5 relative overflow-hidden"
-                style={{ backgroundColor: meta.bg, borderColor: `${meta.color}30` }}
+                className="rounded-lg p-3 border space-y-2.5 relative overflow-hidden transition-all duration-300"
+                style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', borderLeftColor: meta.color, borderLeftWidth: 3 }}
               >
                 {/* Grade badge */}
                 <div className="absolute top-2.5 right-2.5">
@@ -151,8 +151,8 @@ export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sect
                     {meta.icon}
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-white">{sg.sector}</p>
-                    <p className="text-[8px] font-mono" style={{ color: '#64748B' }}>
+                    <p className="text-[10px] font-bold text-[var(--text-primary)]">{sg.sector}</p>
+                    <p className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
                       {sg.resolvedCount} resolved · {sg.activeCount} active
                     </p>
                   </div>
@@ -161,10 +161,10 @@ export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sect
                 {/* SLA Progress bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[8px] font-mono">
-                    <span style={{ color: '#64748B' }}>SLA Resolution Rate</span>
+                    <span style={{ color: 'var(--text-muted)' }}>SLA Resolution Rate</span>
                     <span className="font-bold" style={{ color: meta.color }}>{sg.slaRate}%</span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)' }}>
                     <div
                       className="h-full rounded-full transition-all duration-1000"
                       style={{
@@ -177,9 +177,9 @@ export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sect
                 </div>
 
                 {/* Avg resolution */}
-                <div className="flex items-center justify-between text-[8px] font-mono border-t pt-1.5" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                  <span style={{ color: '#64748B' }}>Avg Resolution:</span>
-                  <span className="font-bold text-white">
+                <div className="flex items-center justify-between text-[9px] font-mono border-t pt-1.5" style={{ borderColor: 'var(--border-secondary)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Avg Resolution:</span>
+                  <span className="font-bold text-[var(--text-primary)]">
                     {sg.avgResolutionHours < 1
                       ? `${Math.round(sg.avgResolutionHours * 60)}m`
                       : `${sg.avgResolutionHours.toFixed(1)}h`}
@@ -192,13 +192,13 @@ export const MunicipalTrustMatrix: React.FC<MunicipalTrustMatrixProps> = ({ sect
 
         {/* Trust Gauge */}
         <div className="lg:col-span-1 flex flex-col items-center justify-center rounded-lg border p-4 h-full"
-          style={{ backgroundColor: 'rgba(0,255,204,0.03)', borderColor: 'rgba(0,255,204,0.12)' }}>
+          style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
           <TrustGauge score={trustScore} />
         </div>
       </div>
 
       {/* Grade legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t text-[8px] font-mono" style={{ borderColor: 'rgba(255,255,255,0.05)', color: '#64748B' }}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t text-[9px] font-mono" style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
         <span><span className="grade-aplus font-bold">A+</span> &lt;2h</span>
         <span><span className="grade-a font-bold">A</span> &lt;4h</span>
         <span><span className="grade-bplus font-bold">B+</span> &lt;6h</span>
