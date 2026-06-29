@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-cyan: var(--accent-cyan);
+  --color-brand-amber: var(--accent-amber);
+  --color-brand-emerald: var(--accent-cyan);
+  --font-sans: 'Inter', 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Theme variables */
+:root {
+  color-scheme: dark;
+  --bg-primary: #090F10;
+  --bg-secondary: #0E1719;
+  --bg-card: rgba(14, 23, 25, 0.7);
+  --bg-card-raw: #0E1719;
+  --border-primary: rgba(0, 255, 204, 0.2);
+  --border-secondary: rgba(255, 255, 255, 0.08);
+  --text-primary: #F4F4F5;
+  --text-secondary: #00FFCC; /* Toxic Green accent */
+  --text-muted: #7E9C9F;
+  --accent-cyan: #00FFCC;
+  --accent-amber: #FFCC00;
+  --accent-red: #FF3B30;
+  --accent-red-hover: #E62A20;
+  --grid-line: rgba(0, 255, 204, 0.05);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #FDFBF7;
+  --bg-secondary: #F5F2EB;
+  --bg-card: rgba(245, 242, 235, 0.9);
+  --bg-card-raw: #F5F2EB;
+  --border-primary: rgba(0, 102, 80, 0.45);
+  --border-secondary: rgba(0, 0, 0, 0.18);
+  --text-primary: #090F10;
+  --text-secondary: #006650; /* Deep high-contrast emerald-cyan */
+  --text-muted: #3D4F51;
+  --accent-cyan: #006650;
+  --accent-amber: #944200;
+  --accent-red: #B0120A;
+  --accent-red-hover: #940B04;
+  --grid-line: rgba(0, 102, 80, 0.07);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  background-image: 
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-primary);
+}
+
+/* Custom Keyframes for glowing animations */
+@keyframes pulse-cyan {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.15), 0 0 2px rgba(0, 255, 204, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 255, 204, 0.45), 0 0 4px rgba(0, 255, 204, 0.6);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-amber {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.15), 0 0 2px rgba(255, 204, 0, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 204, 0, 0.45), 0 0 4px rgba(255, 204, 0, 0.6);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-emerald {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.15), 0 0 2px rgba(0, 255, 204, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 255, 204, 0.45), 0 0 4px rgba(0, 255, 204, 0.6);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-cyan {
+  animation: pulse-cyan 2s infinite ease-in-out;
+}
+
+.animate-pulse-amber {
+  animation: pulse-amber 2s infinite ease-in-out;
+}
+
+.animate-pulse-emerald {
+  animation: pulse-emerald 2s infinite ease-in-out;
+}
+
+/* Glassmorphism class helpers */
+.glass-panel {
+  background-color: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-secondary);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background-color: var(--bg-card-raw);
+  border-color: var(--border-primary);
+}
+
+/* Custom premium transitions */
+@keyframes slide-down {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-left {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-left {
+  animation: slide-left 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
