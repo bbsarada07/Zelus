@@ -13,11 +13,20 @@ export interface WebhookLog {
   payload: string;
 }
 
+export type IncidentCategory =
+  | 'Road & Structural Damage'
+  | 'Water Outage & Flooding'
+  | 'Utility & Spark Hazard'
+  | 'Stray Animal Welfare & Rescue'
+  | 'Urban Forestry Protection'
+  | 'Sanitation Operations'
+  | 'Neighborhood Mediation';
+
 export interface Incident {
   id: string;
-  category: string;
+  category: IncidentCategory | string;
   location: string;
-  coordinates: [number, number]; // [x, y] representing map grid position (0-100 values)
+  coordinates: [number, number];
   severity: 'Critical' | 'Moderate' | 'Low';
   status: 'Triage' | 'Bounty_Posted' | 'Claimed_In_Progress' | 'Peer_Review' | 'Resolved';
   upvotes: number;
@@ -52,6 +61,8 @@ export interface Incident {
     labor: number;
     total: number;
   };
+  resolvedAt?: number;
+  dispatchedAt?: number;
 }
 
 export type UserRole = 'Admin' | 'Citizen' | 'Contractor';
@@ -86,3 +97,19 @@ export interface DevLog {
   raw?: Record<string, unknown>;
 }
 
+export type MunicipalSector = 'Animal Care Services' | 'Sanitation Swarms' | 'Public Works Division' | 'Civil Mediation Squads';
+
+export interface SectorGrade {
+  sector: MunicipalSector;
+  slaRate: number;
+  avgResolutionHours: number;
+  grade: 'A+' | 'A' | 'B+' | 'B' | 'C' | 'D' | 'D-';
+  resolvedCount: number;
+  activeCount: number;
+}
+
+export interface ToastNotification {
+  id: string;
+  message: string;
+  type: 'success' | 'warning' | 'error' | 'info';
+}

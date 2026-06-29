@@ -17,7 +17,8 @@ export const initialIncidents: Incident[] = [
     image: "/water_main_burst.png",
     geolocation: { lat: 17.4501, lng: 78.5252 },
     exifVerified: true,
-    hash: "0x3EAA89FD2B019283EEFFCA89D20E89104A12B890A98F7E8D8A89BC8D9C0A89EE"
+    hash: "0x3EAA89FD2B019283EEFFCA89D20E89104A12B890A98F7E8D8A89BC8D9C0A89EE",
+    dispatchedAt: Date.now() - 1.5 * 60 * 60 * 1000
   },
   {
     id: "INC-2026-002",
@@ -53,7 +54,80 @@ export const initialIncidents: Incident[] = [
     image: "/downed_power_line.png",
     geolocation: { lat: 17.4480, lng: 78.5210 },
     exifVerified: true,
-    hash: "0x77CC8FEEB2019283EEFFCA89D20E89104A12B890A98F7E8D8A89BC8D9C0A89FF"
+    hash: "0x77CC8FEEB2019283EEFFCA89D20E89104A12B890A98F7E8D8A89BC8D9C0A89FF",
+    dispatchedAt: Date.now() - 25 * 60 * 1000
+  },
+  {
+    id: "INC-2026-004",
+    category: "Stray Animal Welfare & Rescue",
+    location: "Greenfield Park North Entrance",
+    coordinates: [17.4530, 78.5195],
+    severity: "Moderate",
+    status: "Triage",
+    upvotes: 14,
+    description: "Pack of 4 untagged stray canines near playground area. Vaccination status unknown. Immediate rescue dispatch required.",
+    materials: ["Animal Control Transport Crates (4 units)", "Veterinary Sedation Kit", "Bio-Safe Disposal Bags"],
+    costBreakdown: { materials: 200, labor: 300, total: 500 },
+    languageBadge: null,
+    timestamp: "35 mins ago",
+    image: "/road_pothole.png",
+    geolocation: { lat: 17.4530, lng: 78.5195 },
+    exifVerified: true,
+    hash: "0xA1BC2DEF3456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789AB"
+  },
+  {
+    id: "INC-2026-005",
+    category: "Urban Forestry Protection",
+    location: "Elm Street Median Corridor",
+    coordinates: [17.4510, 78.5240],
+    severity: "Low",
+    status: "Triage",
+    upvotes: 7,
+    description: "Three dead oak canopy branches overhanging pedestrian walkway. Risk of collapse during next rain event. Immediate trimming scheduled.",
+    materials: ["Chainsaw Rental (8hr)", "Wood Chipper Service (half day)", "Traffic Management Cones (12 units)"],
+    costBreakdown: { materials: 320, labor: 280, total: 600 },
+    languageBadge: null,
+    timestamp: "2 hours ago",
+    image: "/road_pothole.png",
+    geolocation: { lat: 17.4510, lng: 78.5240 },
+    exifVerified: true,
+    hash: "0xB2CD3EF04567890BCDEF1234567890BCDEF1234567890BCDEF1234567890BCDE"
+  },
+  {
+    id: "INC-2026-006",
+    category: "Sanitation Operations",
+    location: "Commercial Zone Delta — Block 7",
+    coordinates: [17.4488, 78.5265],
+    severity: "Moderate",
+    status: "Triage",
+    upvotes: 22,
+    description: "Overflowing commercial waste vault and illegally dumped construction debris blocking service lane. Bio-hazard classification pending.",
+    materials: ["Industrial Skip Bin Rental (8 cubic m)", "PPE Kits for 4 Workers", "Pressure Wash Service Unit"],
+    costBreakdown: { materials: 400, labor: 350, total: 750 },
+    languageBadge: null,
+    timestamp: "45 mins ago",
+    image: "/road_pothole.png",
+    geolocation: { lat: 17.4488, lng: 78.5265 },
+    exifVerified: true,
+    hash: "0xC3DE4F1056789ABCDEF2345678ABCDEF2345678ABCDEF2345678ABCDEF23456"
+  },
+  {
+    id: "INC-2026-007",
+    category: "Neighborhood Mediation",
+    location: "Residential Block 12-C, Sunset Ave",
+    coordinates: [17.4495, 78.5272],
+    severity: "Low",
+    status: "Triage",
+    upvotes: 5,
+    description: "Ongoing commercial noise ordinance violation. Neighboring construction operating past 10PM restriction boundary. Mediation intake registered to bypass slow bureaucracy pipeline.",
+    materials: ["Decibel Monitoring Device Rental", "Printed Mediation Notice Forms", "Official Warning Documentation Pack"],
+    costBreakdown: { materials: 80, labor: 120, total: 200 },
+    languageBadge: null,
+    timestamp: "3 hours ago",
+    image: "/road_pothole.png",
+    geolocation: { lat: 17.4495, lng: 78.5272 },
+    exifVerified: false,
+    hash: "0xD4EF50167890BCDEF345678BCDEF345678BCDEF345678BCDEF345678BCDEF345"
   }
 ];
 
