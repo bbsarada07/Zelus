@@ -53,29 +53,39 @@
 }
 
 /* ── Global Typography Scaling & Readability ─────────────── */
-.text-\[7px\], .text-\[7\.5px\], .text-\[8px\], .text-\[8\.5px\], .text-\[9px\], .text-\[9\.5px\] {
+/* Micro-telemetry labels (7-9.5px classes) → legible 11px */
+.text-\[7px\], .text-\[7\.5px\], .text-\[8px\] {
+  font-size: 11px !important;
+}
+.text-\[8\.5px\], .text-\[9px\], .text-\[9\.5px\] {
   font-size: 12px !important;
 }
-.text-\[10px\], .text-\[11px\], .text-xs, .text-\[12px\], .text-\[13px\] {
-  font-size: 14px !important;
+/* Body metrics & card content (10-13px classes) → 0.95rem (≈15.2px) */
+.text-\[10px\], .text-\[11px\] {
+  font-size: 13px !important;
 }
+.text-xs, .text-\[12px\], .text-\[13px\] {
+  font-size: 0.875rem !important; /* 14px */
+}
+/* Standard body text */
 .text-sm, .text-\[14px\], .text-\[15px\] {
-  font-size: 15px !important;
+  font-size: 0.95rem !important; /* ~15.2px */
 }
 .text-base, .text-\[16px\] {
-  font-size: 17px !important;
+  font-size: 1rem !important; /* 16px */
 }
+/* Headings → clean 1.25rem standard */
 .text-lg {
-  font-size: 19px !important;
+  font-size: 1.15rem !important;
 }
 .text-xl {
-  font-size: 22px !important;
+  font-size: 1.25rem !important;
 }
 .text-2xl {
-  font-size: 26px !important;
+  font-size: 1.5rem !important;
 }
 .text-3xl {
-  font-size: 32px !important;
+  font-size: 1.875rem !important;
 }
 
 
