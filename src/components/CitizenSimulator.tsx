@@ -3,111 +3,316 @@ import type { Incident, UserSession, Theme } from '../types';
 import { 
   Camera, 
   MapPin, 
-  ThumbsUp, 
   Award, 
-  Wifi, 
-  Battery, 
-  Terminal, 
-  CheckCircle,
-  PlusCircle,
-  X,
-  Map,
-  Mic,
-  RefreshCw,
-  ShieldCheck,
-  Wrench,
-  Send,
-  Hourglass,
-  Clock,
-  Coins
+  Coins, 
+  PlusCircle, 
+  X, 
+  Mic, 
+  CheckCircle2,
+  Languages,
+  Sparkles
 } from 'lucide-react';
 
 interface CitizenSimulatorProps {
   incidents: Incident[];
   onAddIncident: (incident: Omit<Incident, 'id' | 'timestamp' | 'mergedCount'>) => void;
   onUpvoteIncident: (id: string) => void;
-  onAuthorizeDispatch?: (id: string) => void;
   session: UserSession;
   onUpdateKarma: (xp: number) => void;
-  isStandaloneMobile?: boolean;
-  theme?: Theme;
-  onConfirmResolution?: (id: string, verification: { name: string; timestamp: string; photo: string }) => void;
+  theme: Theme;
+  onConfirmResolution: (id: string, verification: { name: string; timestamp: string; photo: string }) => void;
 }
-const CitizenClaimCountdown: React.FC<{ targetTime: number }> = ({ targetTime }) => {
-  const [timeLeft, setTimeLeft] = useState<string>('');
-  useEffect(() => {
-    const update = () => {
-      const diff = targetTime - Date.now();
-      if (diff <= 0) {
-        setTimeLeft('00:00:00 - ETA EXCEEDED');
-        return;
-      }
-      const hrs = Math.floor(diff / 3600000);
-      const mins = Math.floor((diff % 3600000) / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(`${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`);
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [targetTime]);
-  return <span className="font-mono font-bold text-brand-amber">{timeLeft}</span>;
-};
-
 
 export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
   incidents,
   onAddIncident,
   onUpvoteIncident,
-  onAuthorizeDispatch,
   session,
   onUpdateKarma,
-  isStandaloneMobile = false,
-  theme: _theme = 'dark',
+  theme,
   onConfirmResolution,
 }) => {
-  // Mobile UI screens: 'map' | 'report' | 'profile'
-  const [activeTab, setActiveTab] = useState<'map' | 'report' | 'profile'>('map');
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const isDark = theme === 'dark';
+
+  // Mobile tabs: 'marketplace' | 'report' | 'ledger'
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'report' | 'ledger'>('marketplace');
+  
+  // Active selected bounty for verification
+  const [selectedBounty, setSelectedBounty] = useState<Incident | null>(null);
 
   // Form State
   const [reportCategory, setReportCategory] = useState('Road & Structural Damage');
-  const [reportLocation, setReportLocation] = useState('Central Avenue (Corner Plaza)');
-  const [reportX, setReportX] = useState(50);
-  const [reportY, setReportY] = useState(50);
+  const [reportLocation, setReportLocation] = useState('Sector 4 Area');
+  const [reportX, setReportX] = useState(48.2);
+  const [reportY, setReportY] = useState(61.9);
   const [reportNotes, setReportNotes] = useState('');
-  const [reportImage, setReportImage] = useState('/road_pothole.png');
+  const [reportImage, setReportImage] = useState('');
+  const [reportSeverity, setReportSeverity] = useState<'Critical' | 'Moderate' | 'Low'>('Moderate');
+  const [languageBadge, setLanguageBadge] = useState<string | null>(null);
 
-  // Terminal AI Simulation States
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [cliLogs, setCliLogs] = useState<string[]>([]);
-  const [showSuccess, setShowSuccess] = useState(false);
+  // Automated Geolocation states
+  const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
-  // Hardware APIs & Stream States
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  // AI & Processing States
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   
-  // Camera States
-  const cameraStreamRef = useRef<MediaStream | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-
-  // Audio Recording States
+  // Voice Recording parameters
   const [isRecording, setIsRecording] = useState(false);
-  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const voiceCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const voiceAnimationRef = useRef<number | null>(null);
 
-  // Peer Handshake verification states
+  // AI Pipeline Toggles: 'off' | 'enhance' | 'translate'
+  const [aiPipelineMode, setAiPipelineMode] = useState<'off' | 'enhance' | 'translate'>('off');
+
+  // Submit UI states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cliLogs, setCliLogs] = useState<string[]>([]);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+
+  // Selfie validation states
   const handshakeVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [handshakeStep, setHandshakeStep] = useState<'idle' | 'streaming' | 'countdown' | 'completed'>('idle');
-  const [handshakeCountdown, setHandshakeCountdown] = useState(2);
   const handshakeStreamRef = useRef<MediaStream | null>(null);
+  const [handshakeStep, setHandshakeStep] = useState<'idle' | 'streaming' | 'countdown'>('idle');
+  const [handshakeCountdown, setHandshakeCountdown] = useState(2);
 
-  const startHandshakeCamera = async () => {
+  const stopCamera = () => {
+    if (handshakeStreamRef.current) {
+      handshakeStreamRef.current.getTracks().forEach(t => t.stop());
+      handshakeStreamRef.current = null;
+    }
+    setHandshakeStep('idle');
+  };
+
+  const startCamera = () => {
+    // Stub for Tab navigation triggers
+  };
+
+  // Transaction Ledger log history
+  const [karmaTransactions, setKarmaTransactions] = useState<Array<{ id: string; msg: string; xp: string; time: string }>>([]);
+
+  // Fetch geolocation on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setGeoCoords({ lat, lng });
+          
+          // Map to simulated X, Y (0-100)
+          const simulatedX = parseFloat((35 + Math.abs((lng * 100) % 40)).toFixed(1));
+          const simulatedY = parseFloat((35 + Math.abs((lat * 100) % 40)).toFixed(1));
+          setReportX(simulatedX);
+          setReportY(simulatedY);
+          setReportLocation(`Grid Node: [Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}]`);
+        },
+        (err) => {
+          console.warn("Geolocation access denied. Setting default grid coordinates.", err);
+          setGeoCoords({ lat: 40.7128, lng: -74.0060 });
+          setGeoError("Perms blocked - default seed coordinates injected");
+        }
+      );
+    } else {
+      setGeoCoords({ lat: 40.7128, lng: -74.0060 });
+      setGeoError("Browser does not support geolocation");
+    }
+  }, []);
+
+  // Sync / Init Karma Logs
+  useEffect(() => {
+    const savedLogs = localStorage.getItem(`zelus_karma_logs_${session.username}`);
+    if (savedLogs) {
+      try {
+        setKarmaTransactions(JSON.parse(savedLogs));
+      } catch { /* ignore */ }
+    } else {
+      const initialLogs = [
+        { id: 'tx-1', msg: 'System Bootstrap authentication established', xp: 'CONNECTED', time: '14:02:10' },
+        { id: 'tx-2', msg: 'Operator active registry credit seed', xp: '+120 XP', time: '14:02:11' }
+      ];
+      setKarmaTransactions(initialLogs);
+      localStorage.setItem(`zelus_karma_logs_${session.username}`, JSON.stringify(initialLogs));
+    }
+  }, [session.username]);
+
+  const addKarmaLog = (msg: string, xpChange: string) => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const newLog = {
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      msg,
+      xp: xpChange,
+      time: timeStr
+    };
+    setKarmaTransactions(prev => {
+      const updated = [newLog, ...prev].slice(0, 40);
+      localStorage.setItem(`zelus_karma_logs_${session.username}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Vision Simulator Preset triggers
+  const handleSelectVisionPreset = (presetIndex: number) => {
+    setIsVisionScanning(true);
+    
+    // Simulate image scan pulse
+    setTimeout(() => {
+      setIsVisionScanning(false);
+      
+      if (presetIndex === 0) {
+        // Pothole
+        setReportCategory('Road & Structural Damage');
+        setReportSeverity('Moderate');
+        setReportImage('/road_pothole.png');
+        setReportNotes('Severe road pothole and tarmac damage parsed on main thoroughfare corridor.');
+      } else if (presetIndex === 1) {
+        // Water Leak
+        setReportCategory('Water Outage & Flooding');
+        setReportSeverity('Critical');
+        setReportImage('/water_main_burst.png');
+        setReportNotes('High pressure water pipeline rupture causing heavy localized street flooding.');
+      } else {
+        // Streetlight
+        setReportCategory('Utility & Spark Hazard');
+        setReportSeverity('Low');
+        setReportImage('/downed_power_line.png');
+        setReportNotes('Flickering streetlight fixture exposing internal terminal electrical wires.');
+      }
+    }, 1200);
+  };
+
+  // voice pipeline recording controls
+  const startVoiceRecording = () => {
+    setIsRecording(true);
+    setRecordingTime(0);
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingTime(p => p + 1);
+    }, 1000);
+
+    // Waveform simulation
+    const canvas = voiceCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        let step = 0;
+        const drawWave = () => {
+          if (!isRecording) return;
+          ctx.fillStyle = isDark ? '#050A0B' : '#FAF9F6';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          ctx.strokeStyle = isDark ? '#00FFCC' : '#006650';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2);
+          for (let i = 0; i < canvas.width; i++) {
+            const amp = Math.sin(i * 0.05 + step) * (10 + Math.random() * 15);
+            ctx.lineTo(i, canvas.height / 2 + amp);
+          }
+          ctx.stroke();
+          
+          step += 0.2;
+          voiceAnimationRef.current = requestAnimationFrame(drawWave);
+        };
+        drawWave();
+      }
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+    if (voiceAnimationRef.current) {
+      cancelAnimationFrame(voiceAnimationRef.current);
+    }
+    setIsRecording(false);
+    setTranscribing(true);
+
+    setTimeout(() => {
+      setTranscribing(false);
+      // Run AI enhance / translate logics
+      let text = '';
+      let badge: string | null = null;
+
+      if (aiPipelineMode === 'translate') {
+        text = 'High-severity road surface pothole fracture identified on main sector corridor, impeding vehicular traffic.';
+        badge = '[Translated from Hindi to English]';
+      } else if (aiPipelineMode === 'enhance') {
+        text = 'Observed severe road surface erosion and localized asphalt fracture on main roadway, causing driver deceleration.';
+        badge = null;
+      } else {
+        text = 'sadak par ek bada gaddha hai gaadi chalane me dikkat ho rahi hai.';
+        badge = null;
+      }
+
+      setReportNotes(text);
+      setLanguageBadge(badge);
+    }, 1000);
+  };
+
+  // Submit report to global array
+  const handleReportSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setCliLogs([]);
+    setShowSuccessAlert(false);
+
+    const generatedHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()}`;
+
+    const logs = [
+      '⚡ [ZELUS-ORCHESTRATOR] INITIATING COMPLAINT RECORD...',
+      '🔍 [AEGIS-AGENT] Checking duplicate node signatures...',
+      '🟢 [AEGIS-AGENT] Exif matched, zero fraud flags identified.',
+      `📍 [ATLAS-AGENT] Mapping geospatial vectors: Lat: ${geoCoords?.lat.toFixed(5) || '40.7128'} Lng: ${geoCoords?.lng.toFixed(5) || '-74.0060'}`,
+      '📦 [PERSISTENCE] Syncing node telemetry to global ledger storage...',
+      `🔐 [BLOCKCHAIN] committed secure hash: ${generatedHash.slice(0, 16)}...`,
+      '🏁 [SUCCESS] Incident successfully registered. Outbound alarms triggered!'
+    ];
+
+    let step = 0;
+    const interval = setInterval(() => {
+      if (step < logs.length) {
+        setCliLogs(prev => [...prev, logs[step]]);
+        step++;
+      } else {
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setShowSuccessAlert(true);
+
+          onAddIncident({
+            category: reportCategory,
+            location: reportLocation,
+            coordinates: [reportX, reportY],
+            severity: reportSeverity,
+            status: 'Triage',
+            upvotes: 1,
+            description: reportNotes || 'Civic infrastructure report submitted via mobile portal.',
+            languageBadge: languageBadge,
+            image: reportImage || '/road_pothole.png',
+            geolocation: geoCoords || { lat: 40.7128, lng: -74.0060 },
+            exifVerified: true,
+            hash: generatedHash
+          });
+
+          onUpdateKarma(100);
+          addKarmaLog(`Filed Report: ${reportCategory}`, '+100 XP');
+
+          // Reset inputs
+          setReportNotes('');
+          setReportImage('');
+          setLanguageBadge(null);
+        }, 600);
+      }
+    }, 200);
+  };
+
+  // Selfie handshake verifier
+  const startHandshake = async () => {
     try {
       if (handshakeStreamRef.current) {
         handshakeStreamRef.current.getTracks().forEach(t => t.stop());
@@ -116,66 +321,52 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
         video: { facingMode: 'user', width: 320, height: 240 }
       });
       handshakeStreamRef.current = stream;
+      setHandshakeStep('streaming');
       if (handshakeVideoRef.current) {
         handshakeVideoRef.current.srcObject = stream;
       }
-    } catch (err) {
-      console.warn("Handshake camera fail:", err);
-      // Fallback
+    } catch {
       setHandshakeStep('countdown');
-      if (selectedIncident) {
-        runHandshakeCountdown(selectedIncident.id);
+      if (selectedBounty) {
+        runHandshakeTimer(selectedBounty.id);
       }
     }
   };
 
-  const snapHandshakePhoto = (incidentId: string) => {
+  const snapHandshake = (id: string) => {
     if (handshakeStreamRef.current) {
       handshakeStreamRef.current.getTracks().forEach(t => t.stop());
       handshakeStreamRef.current = null;
     }
     setHandshakeStep('countdown');
-    runHandshakeCountdown(incidentId);
+    runHandshakeTimer(id);
   };
 
-  const runHandshakeCountdown = (incidentId: string) => {
+  const runHandshakeTimer = (id: string) => {
     setHandshakeCountdown(2);
     let count = 2;
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       count--;
       setHandshakeCountdown(count);
       if (count <= 0) {
-        clearInterval(interval);
+        clearInterval(timer);
         setHandshakeStep('idle');
-        
-        // Generate mock signature
-        const newVerification = {
+
+        const newVerify = {
           name: `Citizen Hero #${Math.floor(1000 + Math.random() * 9000)}`,
           timestamp: 'Just Now',
-          photo: ''
+          photo: '/road_pothole.png'
         };
 
-        if (onConfirmResolution) {
-          onConfirmResolution(incidentId, newVerification);
-        }
-
+        onConfirmResolution(id, newVerify);
         onUpdateKarma(30);
+        addKarmaLog(`Consensus verification cast: ${id}`, '+30 XP');
 
-        setSelectedIncident(prev => {
-          if (!prev || prev.id !== incidentId) return prev;
-          const updatedVerifications = [...(prev.verifications || []), newVerification];
-          const isFull = updatedVerifications.length >= 3;
-          return {
-            ...prev,
-            verifications: updatedVerifications,
-            status: isFull ? 'Resolved' : prev.status
-          };
-        });
+        setSelectedBounty(null);
       }
     }, 1000);
   };
 
-  // cleanup handshake stream on unmount
   useEffect(() => {
     return () => {
       if (handshakeStreamRef.current) {
@@ -184,1098 +375,591 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
     };
   }, []);
 
-  // Geolocation Init
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const latVal = position.coords.latitude;
-          const lngVal = position.coords.longitude;
-          setGpsCoords({ lat: latVal, lng: lngVal });
-          
-          // Map to standard [15-85] grid coordinates
-          const xGrid = 20 + Math.abs((lngVal * 100) % 60);
-          const yGrid = 20 + Math.abs((latVal * 100) % 60);
-          setReportX(parseFloat(xGrid.toFixed(1)));
-          setReportY(parseFloat(yGrid.toFixed(1)));
-          setReportLocation(`GeoLoc: [${latVal.toFixed(6)}°, ${lngVal.toFixed(6)}]`);
-        },
-        (error) => {
-          console.warn("Geolocation permission or availability failed. Mocking base station coordinates.", error);
-          setGpsCoords({ lat: 40.7128, lng: -74.0060 });
-        }
-      );
-    } else {
-      setGpsCoords({ lat: 40.7128, lng: -74.0060 });
-    }
-  }, []);
-
-  // Camera Management
-  const startCamera = React.useCallback(async () => {
-    try {
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach(t => t.stop());
-      }
-      if (!navigator.mediaDevices) {
-        throw new Error("navigator.mediaDevices is undefined");
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: 480, height: 360 } 
-      });
-      cameraStreamRef.current = stream;
-      setIsCameraActive(true);
-    } catch (err) {
-      console.warn("Could not access camera stream:", err);
-      setIsCameraActive(false);
-    }
-  }, []);
-
-  const stopCamera = React.useCallback(() => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach(t => t.stop());
-      cameraStreamRef.current = null;
-    }
-    setIsCameraActive(false);
-  }, []);
-
-  // Bind camera stream to video element when active and mounted
-  useEffect(() => {
-    if (isCameraActive && videoRef.current && cameraStreamRef.current) {
-      videoRef.current.srcObject = cameraStreamRef.current;
-    }
-  }, [isCameraActive]);
-
-  useEffect(() => {
-    if (activeTab === 'report' && !capturedPhoto) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [activeTab, capturedPhoto, startCamera, stopCamera]);
-
-  const capturePhoto = () => {
-    if (videoRef.current && cameraStreamRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth || 480;
-      canvas.height = videoRef.current.videoHeight || 360;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        setCapturedPhoto(dataUrl);
-        setReportImage(dataUrl);
-        stopCamera();
-      }
-    }
-  };
-
-  const retakePhoto = () => {
-    setCapturedPhoto(null);
-    setReportImage('');
-    startCamera();
-  };
-
-  // Audio Recording & Glowing Visualizer Management
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setAudioStream(stream);
-
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-      audioContextRef.current = audioCtx;
-      
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyserRef.current = analyser;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
-
-      recorder.start();
-      setIsRecording(true);
-
-      setTimeout(() => {
-        drawWave();
-      }, 50);
-    } catch (err) {
-      console.warn("Audio access failed:", err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
-    if (audioStream) {
-      audioStream.getTracks().forEach(t => t.stop());
-      setAudioStream(null);
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    setIsRecording(false);
-
-    simulateWhisperTranscription();
-  };
-
-  const drawWave = () => {
-    if (!canvasRef.current || !analyserRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const analyser = analyserRef.current;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const width = canvas.width;
-    const height = canvas.height;
-
-    const draw = () => {
-      if (!ctx || !analyser) return;
-      animationFrameRef.current = requestAnimationFrame(draw);
-
-      analyser.getByteTimeDomainData(dataArray);
-
-      ctx.fillStyle = 'rgba(5, 5, 5, 0.4)';
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#00E5FF';
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#00E5FF';
-      ctx.beginPath();
-
-      const sliceWidth = width / bufferLength;
-      let x = 0;
-
-      for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const y = (v * height) / 2;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-
-        x += sliceWidth;
-      }
-
-      ctx.lineTo(width, height / 2);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    };
-
-    draw();
-  };
-
-  const simulateWhisperTranscription = () => {
-    setIsAiLoading(true);
-    setCliLogs([]);
-    
-    const categoryTranscriptions: Record<string, string> = {
-      'Road & Structural Damage': "Large structural fracture and pavement subsidence noticed here. The asphalt is cracking, causing driver deceleration. Immediate repairs required.",
-      'Water Outage & Flooding': "Substantial water pipe leak detected with localized street accumulation. Hydration systems compromised. Urgent plumbing dispatch required.",
-      'Utility & Spark Hazard': "High-voltage distribution cable exposure with electrical flashover risk. Sparks observed near foliage. Critical fire danger.",
-    };
-
-    const transcriptText = categoryTranscriptions[reportCategory] || "Emergency civic distress report recorded via real-time vocal telemetry. Audio integrity verified by regional node. Awaiting dispatcher response.";
-
-    const logs = [
-      '🎤 [MIC] AUDIO STREAM CAPTURE TERMINATED SUCCESSFULLY.',
-      '📦 [BUFFER] Extracting audio stream byte chunks...',
-      '🔍 [SPEECH] Initializing Whisper speech-to-text pipeline...',
-      '📡 [CLOUD] Streaming telemetry to regional AI model...',
-      '🤖 [MODEL] Processing waveforms & filtering noise profiles...',
-      '📝 [TRANSCRIPTION] Output generated: "' + transcriptText + '"',
-      '✅ [SUCCESS] Observation field populated dynamically.'
-    ];
-
-    let currentLogIndex = 0;
-    const interval = setInterval(() => {
-      if (currentLogIndex < logs.length) {
-        setCliLogs((prev) => [...prev, logs[currentLogIndex]]);
-        currentLogIndex++;
-      } else {
-        clearInterval(interval);
-        setTimeout(() => {
-          setIsAiLoading(false);
-          setReportNotes(transcriptText);
-        }, 500);
-      }
-    }, 250);
-  };
-
-  // Pre-configured incident options for demo
-  const reportPresets = [
-    {
-      category: 'Road & Structural Damage',
-      image: '/road_pothole.png',
-      location: 'West End Drive (Near Metro Station)',
-      notes: 'Major tarmac collapse. Needs immediate asphalt patching.',
-    },
-    {
-      category: 'Water Outage & Flooding',
-      image: '/water_main_burst.png',
-      location: '5th Avenue & E 12th St',
-      notes: 'Water main rupture. Heavy flooding on road lanes.',
-    },
-    {
-      category: 'Utility & Spark Hazard',
-      image: '/downed_power_line.png',
-      location: 'Broadway & W 46th St',
-      notes: 'Dangling live cables from pole. High spark risk.',
-    }
-  ];
-
-  const handleSelectPreset = (idx: number) => {
-    const preset = reportPresets[idx];
-    setReportCategory(preset.category);
-    setReportImage(preset.image);
-    setCapturedPhoto(preset.image);
-    setReportLocation(preset.location);
-    setReportNotes(preset.notes);
-    // Add random coordinates to make it interactive on the map
-    setReportX(Math.floor(Math.random() * 60) + 20);
-    setReportY(Math.floor(Math.random() * 60) + 20);
-    stopCamera();
-  };
-
-  // Submit flow with terminal simulation logs
-  const handleReportSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAiLoading(true);
-    setCliLogs([]);
-    setShowSuccess(false);
-
-    const generatedHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()}`;
-
-    const logs = [
-      '⚡ [SYSTEM] INITIATING AI HYPERLOCAL CIVIC PARSING ENGINE...',
-      '🔍 [INFO] Analyzing uploaded multi-spectral visual image matrix...',
-      `📸 [MATCH] Hazard fingerprint identified as "${reportCategory}"`,
-      '📍 [GPS] Triangulating geofence coordinate boundaries: [' + reportX + ', ' + reportY + ']',
-      '🛡️ [SECURITY] Running multi-modal anti-fraud validation...',
-      '📷 [METADATA] Checking EXIF integrity...',
-      '🟢 [VALIDATION] High confidence matching. Device signatures verify.',
-      '🌐 [LEDGER] Generating SHA-256 blockchain audit node...',
-      `🔐 [BLOCKCHAIN] Generated hash: ${generatedHash.slice(0, 24)}...`,
-      '💾 [CONTROL] Writing verified incident log to municipal backend database...',
-      '📡 [SYNC] Synchronized live with Municipal Dashboard...',
-      '🏁 [SUCCESS] Ticket committed successfully. Dispatch alert triggered.'
-    ];
-
-    let currentLogIndex = 0;
-    const interval = setInterval(() => {
-      if (currentLogIndex < logs.length) {
-        setCliLogs((prev) => [...prev, logs[currentLogIndex]]);
-        currentLogIndex++;
-      } else {
-        clearInterval(interval);
-        setTimeout(() => {
-          setIsAiLoading(false);
-          setShowSuccess(true);
-          // Push new incident dynamically to global state
-          onAddIncident({
-            category: reportCategory,
-            location: reportLocation,
-            coordinates: [reportX, reportY],
-            severity: Math.random() > 0.5 ? 'Critical' : 'Moderate',
-            status: 'Triage',
-            upvotes: 1,
-            image: reportImage || '/road_pothole.png',
-            notes: reportNotes || 'AI validated civic report submission.',
-            geolocation: gpsCoords || { lat: 40.7128, lng: -74.0060 },
-            exifVerified: true,
-            hash: generatedHash
-          });
-          onUpdateKarma(50); // Submit earns 50 XP
-          // Reset form to default
-          setReportNotes('');
-          setCapturedPhoto(null);
-          setReportImage('/road_pothole.png');
-        }, 600);
-      }
-    }, 220);
-  };
+  const activeClaims = incidents.filter(i => i.status === 'Bounty_Posted' || i.status === 'Claimed_In_Progress' || i.status === 'Peer_Review');
 
   return (
-    <div className={`select-none ${isStandaloneMobile ? 'w-full max-w-sm mx-auto' : 'w-[360px] h-[720px] shrink-0'}`}>
-      
-      {/* Smartphone Device Mockup Shell */}
-      <div className="w-full h-full bg-zinc-950 border-[6px] border-zinc-800 rounded-[36px] shadow-[0_0_40px_rgba(0,0,0,0.8),0_0_20px_rgba(0,229,255,0.05)] flex flex-col overflow-hidden relative">
-        
-        {/* Device Notch & Speaker */}
-        <div className="absolute top-0 inset-x-0 h-6 bg-zinc-950 flex justify-center items-center z-50">
-          <div className="w-28 h-4 bg-zinc-950 rounded-b-xl border-x border-b border-zinc-850 flex justify-between px-4 items-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-800" />
-            <div className="w-10 h-1 bg-zinc-800 rounded-full" />
-            <span className="w-2.5 h-1.5 rounded-sm bg-zinc-800" />
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full relative" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-20">
 
-        {/* Status Bar */}
-        <div className="h-10 pt-4 px-6 flex justify-between items-center text-[10px] font-mono text-zinc-400 bg-zinc-950 border-b border-zinc-900 shrink-0">
-          <span>22:59</span>
-          <div className="flex items-center gap-1.5">
-            <Wifi className="w-3.5 h-3.5 text-zinc-550" />
-            <span className="text-[8px] bg-zinc-900 border border-zinc-800 px-1 py-0 rounded text-brand-emerald">5G</span>
-            <Battery className="w-3.5 h-3.5 text-zinc-550" />
-          </div>
-        </div>
+        {/* TAB 1: CIVIC MARKETPLACE */}
+        {activeTab === 'marketplace' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Coins className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
+                Civic Marketplace
+              </h3>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Sponsor pool matching and citizen upvote verification channels.
+              </p>
+            </div>
 
-        {/* Dynamic Simulator Screens */}
-        <div className="flex-1 bg-[#050505] relative overflow-hidden flex flex-col">
-          
-          {/* Active Tab Screen 1: GEOFENCED INTERACTIVE MAP */}
-          {activeTab === 'map' && (
-            <div className="flex-1 flex flex-col relative h-full">
-              {/* Map Blueprint Grid */}
-              <div className="flex-1 bg-zinc-950 relative overflow-hidden border-b border-zinc-900">
-                {/* Visual grid gridlines representation */}
-                <div className="absolute inset-0 bg-grid-lines pointer-events-none opacity-20" />
-                <div className="absolute inset-0 bg-radial-gradient pointer-events-none" />
-                
-                {/* Blueprint Smart City Grid SVG */}
-                <svg className="absolute inset-0 w-full h-full text-zinc-900 opacity-60" fill="none">
-                  <path d="M 0 50 L 360 50 M 0 150 L 360 150 M 0 250 L 360 250 M 0 350 L 360 350 M 0 450 L 360 450" stroke="currentColor" strokeWidth="0.5" strokeDasharray="3 3"/>
-                  <path d="M 80 0 L 80 500 M 180 0 L 180 500 M 280 0 L 280 500" stroke="currentColor" strokeWidth="0.5" strokeDasharray="3 3"/>
-                  {/* Grid roads representation */}
-                  <rect x="30" y="40" width="20" height="420" fill="#080808" />
-                  <rect x="150" y="40" width="25" height="420" fill="#080808" />
-                  <rect x="290" y="40" width="20" height="420" fill="#080808" />
-                  <rect x="0" y="100" width="360" height="20" fill="#080808" />
-                  <rect x="0" y="280" width="360" height="25" fill="#080808" />
-                </svg>
-
-                <div className="absolute top-3 left-3 bg-zinc-900/90 border border-zinc-800 rounded px-2.5 py-1 flex items-center gap-1.5 shadow-md">
-                  <Map className="w-3.5 h-3.5 text-brand-cyan" />
-                  <span className="text-[10px] font-mono text-zinc-300">HQ Spatial Monitor</span>
-                </div>
-
-                {/* Glowing coordinate pins */}
-                {incidents.map((incident) => {
-                  if (!incident || !Array.isArray(incident.coordinates)) return null;
-                  const [xPercent, yPercent] = incident.coordinates;
-                  const status = incident.status;
-                  let pinColor = '#00E5FF'; // Triage cyan
-                  let pinBg = 'bg-brand-cyan text-zinc-950';
-
-                  if (status === 'Resolved') {
-                    pinColor = '#00E676';
-                    pinBg = 'bg-brand-emerald text-zinc-950';
-                  } else if (status === 'Bounty_Posted') {
-                    pinColor = '#D946EF'; // fuchsia
-                    pinBg = 'bg-fuchsia-500 text-white';
-                  } else if (status === 'Claimed_In_Progress') {
-                    pinColor = '#FF9100'; // amber
-                    pinBg = 'bg-brand-amber text-zinc-950';
-                  } else if (status === 'Peer_Review') {
-                    pinColor = '#3B82F6'; // blue
-                    pinBg = 'bg-blue-500 text-white animate-pulse';
-                  } else if (status === 'Archived') {
-                    pinColor = '#71717A'; // zinc
-                    pinBg = 'bg-zinc-700 text-zinc-300';
-                  }
+            {activeClaims.length === 0 ? (
+              <div className="text-center py-12 rounded-lg border border-dashed font-mono text-xs animate-pulse" style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
+                [NO ACTIVE CLAIMS IN SECTOR LEDGER]
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {activeClaims.map(inc => {
+                  const verifiedCount = inc.verifications?.length || 0;
+                  const isPeer = inc.status === 'Peer_Review';
 
                   return (
-                    <button
-                      key={incident.id}
-                      onClick={() => setSelectedIncident(incident)}
-                      style={{ left: `${xPercent}%`, top: `${yPercent}%` }}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer focus:outline-none z-20"
+                    <div 
+                      key={inc.id}
+                      onClick={() => setSelectedBounty(inc)}
+                      className="border rounded-lg p-3.5 space-y-3.5 cursor-pointer transition-all hover:scale-[1.01]"
+                      style={{ 
+                        backgroundColor: 'var(--bg-card)', 
+                        borderColor: selectedBounty?.id === inc.id ? 'var(--accent-cyan)' : 'var(--border-secondary)'
+                      }}
                     >
-                      <span className="absolute inset-0 w-8 h-8 -left-2 -top-2 rounded-full scale-110 opacity-30 animate-ping duration-1000 bg-current"
-                            style={{ color: pinColor }} />
-                      <div 
-                        className={`w-4 h-4 rounded-full border border-zinc-950 flex items-center justify-center relative shadow-lg ${pinBg}`}
-                      >
-                        <MapPin className="w-2.5 h-2.5 text-current" />
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[8.5px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                              {inc.id}
+                            </span>
+                            {inc.languageBadge && (
+                              <span className="text-[7.5px] bg-cyan-950/20 text-brand-cyan border border-brand-cyan/20 px-1 rounded font-mono">
+                                {inc.languageBadge}
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-xs font-bold mt-1.5" style={{ color: 'var(--text-primary)' }}>
+                            {inc.category}
+                          </h4>
+                          <span className="text-[9px] flex items-center gap-0.5 mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                            <MapPin className="w-3 h-3 text-zinc-550 shrink-0" />
+                            {inc.location}
+                          </span>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-mono border font-semibold" style={{
+                          backgroundColor: inc.severity === 'Critical' ? 'rgba(255, 59, 48, 0.15)' : 'rgba(255, 204, 0, 0.15)',
+                          borderColor: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)',
+                          color: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)'
+                        }}>
+                          {inc.severity}
+                        </span>
                       </div>
-                    </button>
+
+                      {/* Matching pool progress bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-end text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                          <span>Sponsor Matching Pool</span>
+                          <span style={{ color: 'var(--text-primary)' }}>$550 / $800</span>
+                        </div>
+                        <div className="w-full h-1 bg-zinc-950 rounded-full overflow-hidden border border-zinc-900">
+                          <div className="h-full bg-brand-emerald rounded-full transition-all duration-300" style={{ width: '68%', backgroundColor: 'var(--accent-cyan)' }} />
+                        </div>
+                      </div>
+
+                      {/* Upvotes / verification confirmations count */}
+                      <div className="flex justify-between items-center text-[9px] font-mono pt-1">
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          Votes: <strong style={{ color: 'var(--text-primary)' }}>{inc.upvotes} Consensus</strong>
+                        </span>
+                        <span style={{ color: isPeer ? 'var(--accent-amber)' : 'var(--text-muted)' }}>
+                          {isPeer ? `Awaiting review (${verifiedCount}/3)` : inc.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Bottom Incident drawer sheet */}
-              {selectedIncident ? (
-                <div className="bg-zinc-950 border-t border-zinc-850 p-4 space-y-3 animate-slide-up shrink-0 relative">
-                  <button 
-                    onClick={() => setSelectedIncident(null)}
-                    className="absolute top-2 right-2 text-zinc-550 hover:text-zinc-350 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  <div className="flex items-start gap-3">
-                    <img 
-                      src={selectedIncident.image} 
-                      alt={selectedIncident.category} 
-                      className="w-14 h-14 rounded-md object-cover border border-zinc-800 bg-zinc-900"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono text-zinc-500">{selectedIncident.id}</span>
-                        <span className={`text-[8px] font-mono border px-1 rounded font-bold uppercase ${
-                          selectedIncident.severity === 'Critical' ? 'border-red-900/50 bg-red-950/20 text-red-400' : 'border-brand-amber/30 bg-brand-amber/5 text-brand-amber'
-                        }`}>
-                          {selectedIncident.severity}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-zinc-200 mt-0.5 truncate">{selectedIncident.category}</h4>
-                      <p className="text-[10px] text-zinc-400 flex items-center gap-0.5 mt-0.5 truncate">
-                        <MapPin className="w-2.5 h-2.5" /> {selectedIncident.location}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-zinc-450 leading-relaxed font-sans bg-zinc-900/30 border border-zinc-900 p-2 rounded">
-                    {selectedIncident.notes || 'No community notes submitted.'}
-                  </p>
-
-                  {/* Incident Metadata Ledger */}
-                  <div className="bg-zinc-950 border border-zinc-900 rounded p-2.5 space-y-1.5 font-mono text-[8px] text-zinc-450 select-text">
-                    <span className="text-[8px] font-bold text-brand-cyan uppercase tracking-wider block border-b border-zinc-900 pb-1 mb-1">
-                      Incident Metadata Ledger
-                    </span>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-550">ABS GEOLOCATION:</span>
-                      <span className="text-zinc-300 font-semibold">
-                        {selectedIncident.geolocation 
-                          ? `${selectedIncident.geolocation.lat.toFixed(6)}°, ${selectedIncident.geolocation.lng.toFixed(6)}°` 
-                          : `${(40.7128 + (selectedIncident.coordinates?.[0] || 0) * 0.001).toFixed(6)}°, ${(-74.0060 - (selectedIncident.coordinates?.[1] || 0) * 0.001).toFixed(6)}°`
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-550">EXIF INTEGRITY Check:</span>
-                      <span className={selectedIncident.exifVerified ? "text-brand-emerald font-semibold" : "text-zinc-500 font-semibold"}>
-                        {selectedIncident.exifVerified ? "✓ PASSED (MOBILE SECURE ENCLAVE)" : "N/A (LEGACY SEED)"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-zinc-550 shrink-0">AUDIT SHA-256 KEY:</span>
-                      <span className="text-brand-cyan/85 select-all truncate font-mono text-[7.5px]" title={selectedIncident.hash}>
-                        {selectedIncident.hash ? selectedIncident.hash : `0x${((selectedIncident.coordinates?.[0] || 0) * 9382103).toString(16).padEnd(64, '0').slice(0, 64).toUpperCase()}`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Swarm Audit Ledger */}
-                  <div className="space-y-1 bg-zinc-950 border border-zinc-900 rounded p-2 text-[8px] font-mono text-zinc-500">
-                    <span className="text-[8px] font-bold text-brand-cyan uppercase tracking-wider block border-b border-zinc-900 pb-1 mb-1">
-                      Swarm Audit Ledger
-                    </span>
-                    <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                      <div className="flex flex-col border-b border-zinc-900 pb-1">
-                        <span className="text-zinc-300 font-bold flex items-center gap-1">
-                          <ShieldCheck className="w-2.5 h-2.5 text-brand-cyan" />
-                          [Aegis-Agent]
-                        </span>
-                        <p className="text-zinc-400 mt-0.5 leading-normal">
-                          {selectedIncident.swarmData?.aegisConfidence || 'Confidence Threshold: 98.6% Authentic (Visual checks passed)'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col border-b border-zinc-900 pb-1">
-                        <span className="text-zinc-300 font-bold flex items-center gap-1">
-                          <MapPin className="w-2.5 h-2.5 text-brand-cyan" />
-                          [Atlas-Agent]
-                        </span>
-                        <p className="text-zinc-400 mt-0.5 leading-normal">
-                          {selectedIncident.swarmData?.atlasRouting || 'Routing Optimized via Spatial Matrix (Swarm Triangulated)'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col border-b border-zinc-900 pb-1">
-                        <span className="text-zinc-300 font-bold flex items-center gap-1">
-                          <Wrench className="w-2.5 h-2.5 text-brand-cyan" />
-                          [Vulcan-Agent]
-                        </span>
-                        <p className="text-zinc-400 mt-0.5 leading-normal">
-                          {selectedIncident.swarmData?.vulcanMaterial || 'Resource Dispatched: Asphalt Patching Rig Type-B'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col border-b border-zinc-900 pb-1">
-                        <span className="text-zinc-300 font-bold flex items-center gap-1">
-                          <Send className="w-2.5 h-2.5 text-brand-cyan" />
-                          [Mercury-Agent]
-                        </span>
-                        <p className="text-zinc-400 mt-0.5 leading-normal truncate" title={selectedIncident.swarmData?.mercuryPing}>
-                          {selectedIncident.swarmData?.mercuryPing || 'Outbound target API endpoint success (200 OK)'}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col">
-                        <span className="text-zinc-300 font-bold flex items-center gap-1">
-                          <Hourglass className="w-2.5 h-2.5 text-brand-cyan" />
-                          [Chronos-Agent]
-                        </span>
-                        <p className="text-zinc-400 mt-0.5 leading-normal">
-                          {selectedIncident.swarmData?.chronosEta || 'ETA locked: 14.2 Hours (Predictive degradation verified)'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions & Upvote */}
-                  <div className="flex flex-col gap-2.5 pt-2.5 border-t border-zinc-900/60">
-                    <div className="flex justify-between items-center w-full">
-                      <span className={`text-[8.5px] font-mono border px-1.5 py-0.5 rounded uppercase font-semibold ${
-                        selectedIncident.status === 'Triage' 
-                          ? 'border-brand-cyan/20 bg-brand-cyan/5 text-brand-cyan animate-pulse-cyan' 
-                          : selectedIncident.status === 'Bounty_Posted'
-                          ? 'border-purple-500/20 bg-purple-950/20 text-purple-400'
-                          : selectedIncident.status === 'Claimed_In_Progress'
-                          ? 'border-brand-amber/20 bg-brand-amber/5 text-brand-amber animate-pulse-amber'
-                          : selectedIncident.status === 'Peer_Review'
-                          ? 'border-blue-500/20 bg-blue-950/20 text-blue-400'
-                          : selectedIncident.status === 'Resolved'
-                          ? 'border-brand-emerald/20 bg-brand-emerald/5 text-brand-emerald'
-                          : 'border-zinc-800 bg-zinc-900 text-zinc-550'
-                      }`}>
-                        {selectedIncident.status.replace(/_/g, ' ')}
-                      </span>
-
-                      <button
-                        onClick={() => {
-                          onUpvoteIncident(selectedIncident.id);
-                          onUpdateKarma(10); // Upvote earns 10 XP
-                          setSelectedIncident(prev => prev ? { ...prev, upvotes: prev.upvotes + 1 } : null);
-                        }}
-                        className="flex items-center gap-1 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded px-2.5 py-1 text-[9px] font-mono text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                      >
-                        <ThumbsUp className="w-2.5 h-2.5 text-brand-cyan fill-current" />
-                        Upvote ({selectedIncident.upvotes})
-                      </button>
-                    </div>
-
-                    {/* Progress visual if Claimed or Peer Reviewed */}
-                    {selectedIncident.progressPhoto && (
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest block font-bold">Structural Remediation Evidence</span>
-                        <div className="w-full h-24 rounded overflow-hidden border border-zinc-900 bg-zinc-950">
-                          <img src={selectedIncident.progressPhoto} alt="Remediation" className="w-full h-full object-cover" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Conditional rendering based on status */}
-                    {selectedIncident.status === 'Triage' ? (
-                      <button
-                        onClick={() => {
-                          if (onAuthorizeDispatch) {
-                            onAuthorizeDispatch(selectedIncident.id);
-                          }
-                          setSelectedIncident(prev => prev ? { ...prev, status: 'Bounty_Posted' } : null);
-                        }}
-                        className="w-full py-1.5 bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-bold rounded text-[9.5px] font-mono tracking-wider uppercase transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(0,229,255,0.15)]"
-                      >
-                        <Coins className="w-3.5 h-3.5" />
-                        Post Civic Bounty
-                      </button>
-                    ) : selectedIncident.status === 'Bounty_Posted' ? (
-                      <div className="w-full py-1.5 bg-purple-950/20 border border-purple-900/30 text-purple-400 font-mono text-[9px] rounded text-center uppercase flex items-center justify-center gap-1">
-                        <Coins className="w-3 h-3 animate-bounce" />
-                        Bounty Posted & Open
-                      </div>
-                    ) : selectedIncident.status === 'Claimed_In_Progress' ? (
-                      <div className="space-y-2">
-                        <div className="flex flex-col gap-1 text-[9px] font-mono p-2 bg-zinc-950 border border-zinc-900 rounded">
-                          <div className="flex justify-between items-center">
-                            <span className="text-zinc-550">RESOLUTION COUNTDOWN:</span>
-                            {selectedIncident.etaTargetTime && (
-                              <CitizenClaimCountdown targetTime={selectedIncident.etaTargetTime} />
-                            )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-zinc-550">ASSIGNED CONTRACTOR:</span>
-                            <span className="text-zinc-300 font-bold">{selectedIncident.claimedBy || 'Volunteer'}</span>
-                          </div>
-                        </div>
-                        <div className="w-full py-1.5 bg-brand-amber/10 border border-brand-amber/20 text-brand-amber font-mono text-[9px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 animate-spin" />
-                          Remediation In Progress
-                        </div>
-                      </div>
-                    ) : selectedIncident.status === 'Peer_Review' ? (
-                      /* CITIZEN PEER-VERIFICATION VOTING NODE */
-                      <div className="border border-brand-cyan/25 bg-zinc-950/90 rounded p-2.5 space-y-2.5">
-                        <div className="flex justify-between items-center text-[9px] font-mono font-bold text-brand-cyan border-b border-zinc-900 pb-1">
-                          <span>PEER-VERIFICATION VOTING NODE</span>
-                          <span className="animate-pulse">{(selectedIncident.verifications || []).length}/3 SIGNED</span>
-                        </div>
-                        
-                        {(selectedIncident.verifications || []).length > 0 && (
-                          <div className="space-y-1 max-h-16 overflow-y-auto pr-1">
-                            {selectedIncident.verifications?.map((v, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-zinc-900/60 p-1 rounded text-[8px] font-mono border border-zinc-900">
-                                <span className="text-zinc-400 font-bold">{v.name}</span>
-                                <span className="text-brand-emerald font-semibold">✓ Signed Handshake</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {handshakeStep === 'idle' && (
-                          <button
-                            type="button"
-                            onClick={startHandshakeCamera}
-                            className="w-full py-1.5 bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-bold rounded text-[9px] font-mono tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Camera className="w-3.5 h-3.5" />
-                            Verify (Camera Handshake)
-                          </button>
-                        )}
-
-                        {handshakeStep === 'streaming' && (
-                          <div className="relative rounded overflow-hidden h-28 bg-black flex flex-col justify-end">
-                            <video 
-                              ref={handshakeVideoRef} 
-                              autoPlay 
-                              playsInline 
-                              muted 
-                              className="absolute inset-0 w-full h-full object-cover"
-                            />
-                            <div className="relative z-10 p-1.5 bg-zinc-950/95 border-t border-zinc-900 flex justify-between items-center text-[8.5px]">
-                              <span className="text-brand-cyan animate-pulse">SELFIE HANDSHAKE ACTIVE</span>
-                              <button
-                                type="button"
-                                onClick={() => snapHandshakePhoto(selectedIncident.id)}
-                                className="bg-brand-cyan text-zinc-950 px-2 py-0.5 rounded text-[8px] font-mono font-bold cursor-pointer hover:bg-cyan-400"
-                              >
-                                Confirm Snap
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {handshakeStep === 'countdown' && (
-                          <div className="h-24 bg-zinc-950 border border-zinc-900 rounded flex flex-col items-center justify-center text-center">
-                            <span className="text-2xl font-mono font-bold text-brand-cyan animate-ping">{handshakeCountdown}</span>
-                            <p className="text-[7.5px] font-mono text-zinc-550 mt-1 uppercase tracking-widest">Generating cryptographic proof...</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : selectedIncident.status === 'Resolved' ? (
-                      <div className="w-full py-1.5 bg-brand-emerald/10 border border-brand-emerald/20 text-brand-emerald font-mono text-[9px] rounded text-center uppercase flex items-center justify-center gap-1.5 font-semibold">
-                        <CheckCircle className="w-3 h-3" />
-                        Remediation Resolved
-                      </div>
-                    ) : (
-                      <div className="w-full py-1.5 bg-zinc-900/40 border border-zinc-800 text-zinc-500 font-mono text-[9px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                        <X className="w-3 h-3" />
-                        Ticket Archived
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-zinc-950 p-4 border-t border-zinc-850 flex flex-col items-center justify-center text-center shrink-0">
-                  <p className="text-[10px] font-mono text-zinc-500">
-                    [TAP AN ACTIVE GRAPH MAP PIN TO LOAD DATA]
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Active Tab Screen 2: MULTI-MODAL AI SUBMISSION FORM */}
-          {activeTab === 'report' && (
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 relative">
-              <h3 className="text-xs font-bold tracking-tight text-white border-b border-zinc-900 pb-2">
-                Multi-Modal AI Incident Filing
+        {/* TAB 2: REPORT ENGINE */}
+        {activeTab === 'report' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Camera className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
+                Hyperlocal Report Engine
               </h3>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Automated GPS triangulation and multi-modal voice processing dispatches.
+              </p>
+            </div>
 
-              {/* Preset selection bar for quick testing */}
-              <div className="space-y-1.5">
-                <span className="text-[9px] font-mono text-zinc-500 block uppercase tracking-wider">
-                  Select Simulation Profile Preset:
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPreset(0)}
-                    className="p-1 text-[8px] font-mono bg-zinc-950 border border-zinc-900 rounded hover:border-zinc-700 text-zinc-400 hover:text-white transition-all text-center truncate cursor-pointer"
-                  >
-                    Pothole
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPreset(1)}
-                    className="p-1 text-[8px] font-mono bg-zinc-950 border border-zinc-900 rounded hover:border-zinc-700 text-zinc-400 hover:text-white transition-all text-center truncate cursor-pointer"
-                  >
-                    Flooding
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPreset(2)}
-                    className="p-1 text-[8px] font-mono bg-zinc-950 border border-zinc-900 rounded hover:border-zinc-700 text-zinc-400 hover:text-white transition-all text-center truncate cursor-pointer"
-                  >
-                    Power Line
-                  </button>
-                </div>
+            {/* Presets simulating vision input */}
+            <div className="space-y-1.5 p-2.5 rounded border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
+              <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                GEMINI VISION SIMULATION PRESETS:
+              </span>
+              <div className="grid grid-cols-3 gap-1">
+                <button 
+                  type="button" 
+                  onClick={() => handleSelectVisionPreset(0)}
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                >
+                  [ pothole.png ]
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleSelectVisionPreset(1)}
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                >
+                  [ leak_burst.png ]
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleSelectVisionPreset(2)}
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                >
+                  [ streetlight.png ]
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleReportSubmit} className="space-y-4">
+              {/* Photo Uplink Frame with scanning animations */}
+              <div className="border rounded-lg relative overflow-hidden flex flex-col justify-end min-h-[150px] bg-zinc-950" style={{ borderColor: 'var(--border-secondary)' }}>
+                {isVisionScanning && (
+                  <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center space-y-2 z-30">
+                    <Sparkles className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-cyan)' }} />
+                    <span className="text-[9px] font-mono animate-pulse" style={{ color: 'var(--accent-cyan)' }}>
+                      [GEMINI-VISION-ORCHESTRATOR] // SCANNING DATA...
+                    </span>
+                  </div>
+                )}
+
+                {reportImage ? (
+                  <>
+                    <img src={reportImage} alt="Visual preset" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="relative z-10 p-2 border-t flex justify-between items-center text-[8.5px] font-mono" style={{ backgroundColor: 'rgba(9, 15, 16, 0.95)', borderColor: 'var(--border-secondary)' }}>
+                      <span style={{ color: 'var(--accent-cyan)' }}>IMAGE CAPTURE VERIFIED</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setReportImage('')}
+                        className="px-1.5 py-0.5 border rounded cursor-pointer"
+                        style={{ borderColor: 'var(--border-secondary)', color: 'var(--accent-amber)' }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-8 space-y-2">
+                    <Camera className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>No visual feed loaded</span>
+                  </div>
+                )}
               </div>
 
-              <form onSubmit={handleReportSubmit} className="space-y-3">
-                {/* Simulated Camera Uplink Box */}
-                <div className="border border-zinc-850 rounded-lg bg-zinc-950/80 flex flex-col items-center justify-center text-center relative overflow-hidden group min-h-[140px]">
-                  {capturedPhoto ? (
-                    <div className="absolute inset-0 w-full h-full flex flex-col justify-end">
-                      <img 
-                        src={capturedPhoto} 
-                        alt="preview" 
-                        className="absolute inset-0 w-full h-full object-cover" 
-                      />
-                      <div className="relative z-10 p-2 bg-zinc-950/80 border-t border-zinc-900 flex justify-between items-center">
-                        <span className="text-[8px] font-mono text-zinc-400">Photo Captured</span>
-                        <button
-                          type="button"
-                          onClick={retakePhoto}
-                          className="bg-zinc-900 border border-zinc-805 hover:bg-zinc-850 px-2 py-0.5 rounded text-[8px] font-mono text-brand-cyan flex items-center gap-1 cursor-pointer"
-                        >
-                          <RefreshCw className="w-2.5 h-2.5" /> Retake
-                        </button>
-                      </div>
+              {/* Form parameters */}
+              <div className="space-y-3">
+                {/* Geolocation target chips */}
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Automated GPS Geolocation Engine
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="border rounded px-2.5 py-1.5 flex items-center justify-between text-[9.5px] font-mono" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>LATITUDE:</span>
+                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lat.toFixed(5) || 'Searching...'}</strong>
                     </div>
-                  ) : isCameraActive ? (
-                    <div className="absolute inset-0 w-full h-full flex flex-col justify-end">
-                      <video 
-                        ref={videoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      <div className="relative z-10 p-2 bg-zinc-950/80 border-t border-zinc-900 flex justify-between items-center">
-                        <span className="text-[8px] font-mono text-brand-cyan flex items-center gap-1.5 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          LIVE STREAM
-                        </span>
-                        <button
-                          type="button"
-                          onClick={capturePhoto}
-                          className="bg-brand-cyan text-zinc-950 hover:bg-cyan-400 font-bold px-2 py-0.5 rounded text-[8px] font-mono flex items-center gap-1 cursor-pointer"
-                        >
-                          Capture Photo
-                        </button>
-                      </div>
+                    <div className="border rounded px-2.5 py-1.5 flex items-center justify-between text-[9.5px] font-mono" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>LONGITUDE:</span>
+                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lng.toFixed(5) || 'Searching...'}</strong>
                     </div>
-                  ) : (
-                    <div className="relative z-10 py-4 flex flex-col items-center">
-                      <Camera className="w-6 h-6 text-zinc-650 mb-1" />
-                      <span className="text-[9px] font-mono text-zinc-400 block">Camera Offline</span>
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="mt-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-brand-cyan px-2 py-1 rounded text-[8px] font-mono cursor-pointer"
-                      >
-                        Start Camera Stream
-                      </button>
-                    </div>
+                  </div>
+                  {geoError && (
+                    <span className="text-[7.5px] font-mono block" style={{ color: 'var(--accent-amber)' }}>{geoError}</span>
                   )}
                 </div>
 
-                {/* Form Fields */}
-                <div className="space-y-2.5">
-                  <div>
-                    <label className="block text-[8px] font-mono uppercase tracking-wider text-zinc-500 mb-0.5">Category</label>
-                    <input
-                      type="text"
-                      value={reportCategory}
-                      disabled
-                      className="w-full bg-zinc-950 border border-zinc-900 rounded px-2 py-1 text-[10px] text-zinc-400 font-mono"
-                    />
+                <div>
+                  <label className="block text-[8px] font-mono uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Category Dropdown</label>
+                  <input 
+                    type="text" 
+                    value={reportCategory}
+                    disabled
+                    className="w-full border rounded px-2.5 py-1.5 text-[10px] font-mono select-none"
+                    style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                {/* Multilingual Acoustic AI Pipeline */}
+                <div className="space-y-2 border rounded p-2.5" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[8.5px] font-mono block font-bold" style={{ color: 'var(--text-primary)' }}>
+                      Multilingual Acoustic Pipeline
+                    </span>
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                      disabled={transcribing}
+                      className={`px-2 py-0.5 rounded border text-[8px] font-mono flex items-center gap-1 cursor-pointer transition-all ${
+                        isRecording ? 'border-red-900 bg-red-950/20 text-red-400 animate-pulse' : 'border-zinc-800 text-brand-cyan hover:border-zinc-700'
+                      }`}
+                      style={{
+                        borderColor: isRecording ? 'var(--accent-red)' : 'var(--border-primary)',
+                        color: isRecording ? 'var(--accent-red)' : 'var(--accent-cyan)'
+                      }}
+                    >
+                      <Mic className="w-2.5 h-2.5" />
+                      {isRecording ? `Recording (${recordingTime}s)` : transcribing ? 'Transcribing...' : 'Record Note'}
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-[8px] font-mono uppercase tracking-wider text-zinc-500 mb-0.5">Geospatial Coordinate Target</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-zinc-950 border border-zinc-900 rounded px-2 py-1 text-[10px] text-zinc-400 font-mono flex items-center justify-between">
-                        <span>Grid X</span>
-                        <span className="text-brand-cyan font-bold">{reportX}%</span>
-                      </div>
-                      <div className="bg-zinc-950 border border-zinc-900 rounded px-2 py-1 text-[10px] text-zinc-400 font-mono flex items-center justify-between">
-                        <span>Grid Y</span>
-                        <span className="text-brand-cyan font-bold">{reportY}%</span>
-                      </div>
-                    </div>
-                  </div>
+                  {isRecording && (
+                    <canvas ref={voiceCanvasRef} width={300} height={32} className="w-full h-8 rounded border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }} />
+                  )}
 
-                  <div>
-                    <label className="block text-[8px] font-mono uppercase tracking-wider text-zinc-500 mb-0.5">Location Details</label>
-                    <input
-                      type="text"
-                      value={reportLocation}
-                      onChange={(e) => setReportLocation(e.target.value)}
-                      required
-                      className="w-full bg-zinc-950 border border-zinc-900 rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-brand-cyan/60 font-mono"
-                      placeholder="Enter location address..."
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-0.5">
-                      <label className="block text-[8px] font-mono uppercase tracking-wider text-zinc-500">Additional Observations</label>
+                  {/* Dual stage Switch */}
+                  <div className="flex flex-col gap-1 pt-1.5 border-t" style={{ borderColor: 'var(--border-secondary)' }}>
+                    <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                      Gemini AI Enhance & Translate Configuration
+                    </span>
+                    <div className="grid grid-cols-3 gap-1 p-0.5 rounded border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
                       <button
                         type="button"
-                        onClick={isRecording ? stopRecording : startRecording}
-                        className={`px-1.5 py-0.5 border rounded text-[8px] font-mono flex items-center gap-1 cursor-pointer transition-all ${
-                          isRecording 
-                            ? 'border-red-900/60 bg-red-950/20 text-red-400 animate-pulse' 
-                            : 'border-brand-cyan/20 bg-brand-cyan/5 text-brand-cyan hover:border-brand-cyan/60'
-                        }`}
+                        onClick={() => setAiPipelineMode('off')}
+                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
+                        style={{
+                          backgroundColor: aiPipelineMode === 'off' ? 'var(--bg-primary)' : 'transparent',
+                          color: aiPipelineMode === 'off' ? 'var(--accent-cyan)' : 'var(--text-muted)'
+                        }}
                       >
-                        <Mic className="w-2.5 h-2.5" />
-                        {isRecording ? 'Stop Recording' : 'Record Observations'}
+                        OFF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAiPipelineMode('enhance')}
+                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
+                        style={{
+                          backgroundColor: aiPipelineMode === 'enhance' ? 'var(--bg-primary)' : 'transparent',
+                          color: aiPipelineMode === 'enhance' ? 'var(--accent-cyan)' : 'var(--text-muted)'
+                        }}
+                      >
+                        STG 1: ENHANCE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAiPipelineMode('translate')}
+                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
+                        style={{
+                          backgroundColor: aiPipelineMode === 'translate' ? 'var(--bg-primary)' : 'transparent',
+                          color: aiPipelineMode === 'translate' ? 'var(--accent-cyan)' : 'var(--text-muted)'
+                        }}
+                      >
+                        STG 2: TRANSLATE
                       </button>
                     </div>
-
-                    {isRecording && (
-                      <div className="border border-zinc-900 rounded p-1 mb-1.5 bg-[#050505] flex flex-col items-center">
-                        <canvas 
-                          ref={canvasRef} 
-                          width={320} 
-                          height={40} 
-                          className="w-full h-[40px] bg-zinc-950/80 rounded"
-                        />
-                        <span className="text-[7.5px] font-mono text-zinc-500 mt-0.5 block tracking-tight">
-                          RECORDING TELEMETRY... SHIFT WAV FOR FREQ ANALYSIS
-                        </span>
-                      </div>
-                    )}
-
-                    <textarea
-                      rows={2}
-                      value={reportNotes}
-                      onChange={(e) => setReportNotes(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-900 rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-brand-cyan/60 resize-none font-sans"
-                      placeholder="Add structural context or use Voice Recording..."
-                    />
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2 bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-bold rounded text-[10px] font-mono tracking-wider uppercase transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(0,229,255,0.15)]"
+                {/* Description notes */}
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Observational transcript
+                  </label>
+                  <textarea 
+                    value={reportNotes}
+                    onChange={(e) => setReportNotes(e.target.value)}
+                    required
+                    rows={3}
+                    placeholder="Enter observation notes or use simulated Voice Recording..."
+                    className="w-full border rounded px-2.5 py-1.5 text-[10px] focus:outline-none focus:border-brand-cyan/60 resize-none font-sans"
+                    style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                  />
+                  {languageBadge && (
+                    <div className="flex items-center gap-1 text-[8px] font-mono text-brand-cyan uppercase tracking-wider mt-1">
+                      <Languages className="w-3.5 h-3.5" />
+                      <span>{languageBadge}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Submit Report */}
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 font-bold font-mono text-[10px] tracking-wider uppercase rounded cursor-pointer transition-all flex items-center justify-center gap-1 shadow-lg border animate-pulse"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderColor: 'var(--accent-cyan)',
+                  color: 'var(--accent-cyan)',
+                  boxShadow: '0 0 10px rgba(0, 255, 204, 0.1)'
+                }}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                FILE REPORT
+              </button>
+            </form>
+
+            {/* Submitting CLI logs */}
+            {isSubmitting && (
+              <div className="absolute inset-0 z-50 p-4 font-mono text-[9px] flex flex-col" style={{ backgroundColor: 'rgba(9, 15, 16, 0.97)', color: 'var(--accent-cyan)' }}>
+                <div className="flex items-center gap-1.5 border-b pb-2 mb-3" style={{ borderColor: 'var(--border-secondary)' }}>
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  <span className="text-white font-bold uppercase tracking-widest text-[9.5px]">Zelus Swarm Triage dispatch</span>
+                </div>
+                <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+                  {cliLogs.map((log, idx) => (
+                    <div key={idx} className={log.includes('SUCCESS') ? 'text-brand-emerald' : 'text-zinc-350'}>
+                      {log}
+                    </div>
+                  ))}
+                  <span className="w-1.5 h-3 inline-block bg-current animate-pulse" />
+                </div>
+              </div>
+            )}
+
+            {/* Success alert screen */}
+            {showSuccessAlert && (
+              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 p-5 border rounded-lg text-center shadow-2xl z-40 space-y-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                <CheckCircle2 className="w-10 h-10 mx-auto" style={{ color: 'var(--accent-cyan)' }} />
+                <div>
+                  <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>DISTRESS RECORD COMMITTED</h4>
+                  <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Secure checksum committed to local ledger storage (+100 XP).
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowSuccessAlert(false);
+                    setActiveTab('marketplace');
+                  }}
+                  className="w-full py-1 bg-zinc-900 border rounded text-[9.5px] font-mono cursor-pointer transition-colors"
+                  style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  File Report
+                  Return to Marketplace
                 </button>
-              </form>
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* Terminal Simulator Overlay (Absolute Position overlay inside phone viewport) */}
-              {isAiLoading && (
-                <div className="absolute inset-0 bg-zinc-950/95 flex flex-col p-4 z-40 font-mono text-[9px] text-brand-cyan">
-                  <div className="flex items-center gap-1.5 border-b border-zinc-900 pb-2 mb-3">
-                    <Terminal className="w-3.5 h-3.5 text-brand-cyan" />
-                    <span className="font-bold tracking-tight text-white">Zelus Triage CLI</span>
-                  </div>
-                  <div className="flex-1 space-y-2 overflow-y-auto pr-1 select-text">
-                    {cliLogs.map((log, idx) => (
-                      <div key={idx} className={log.includes('SUCCESS') ? 'text-brand-emerald' : log.includes('INFO') ? 'text-zinc-400' : 'text-brand-cyan'}>
-                        {log}
-                      </div>
-                    ))}
-                    <div className="w-1.5 h-3 bg-brand-cyan animate-pulse inline-block" />
-                  </div>
-                </div>
-              )}
-
-              {/* Success Notification Alert */}
-              {showSuccess && (
-                <div className="absolute inset-x-4 top-4 bg-zinc-950 border border-brand-emerald/40 rounded-lg p-4 shadow-2xl z-40 text-center animate-slide-up space-y-3">
-                  <CheckCircle className="w-8 h-8 text-brand-emerald mx-auto" />
-                  <div>
-                    <h4 className="text-xs font-bold text-white">Incident Ledger Updated</h4>
-                    <p className="text-[9px] text-zinc-400 mt-1">
-                      AI anti-fraud checked completed. Incident synchronized to regional admin console (+50 XP).
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowSuccess(false);
-                      setActiveTab('map');
-                    }}
-                    className="w-full py-1 bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-300 hover:text-white rounded cursor-pointer transition-colors"
-                  >
-                    Return to Map View
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Active Tab Screen 3: CIVIC KARMA LEDGER */}
-          {activeTab === 'profile' && (
-            <div className="flex-1 p-4 overflow-y-auto space-y-4">
-              <h3 className="text-xs font-bold tracking-tight text-white border-b border-zinc-900 pb-2">
+        {/* TAB 3: CIVIC KARMA LEDGER */}
+        {activeTab === 'ledger' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <Award className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
                 Civic Karma Ledger
               </h3>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Official volunteer credit balance and status badge credentials.
+              </p>
+            </div>
 
-              {/* Bento Grid Profile Card */}
-              <div className="glass-panel border-zinc-900 rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center relative overflow-hidden">
-                    <Award className="w-5 h-5 text-brand-emerald" />
-                  </div>
+            {/* Progression Radial Progress bar */}
+            <div className="border rounded-lg p-5 flex items-center justify-between shadow-lg" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+              <div className="space-y-1.5 flex-1 pr-4">
+                <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                  Karma XP Progression
+                </span>
+                <h4 className="text-sm font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                  {session.username}
+                </h4>
+                <p className="text-[9px] uppercase font-bold tracking-widest font-mono" style={{ color: 'var(--accent-cyan)' }}>
+                  {session.karmaXP >= 300 ? 'INFRASTRUCTURE GUARD' : 'WATER WATCHER'}
+                </p>
+              </div>
+
+              {/* Radial Progress Ring SVG */}
+              <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                <svg className="w-full h-full rotate-[-90deg]">
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="var(--bg-secondary)" strokeWidth="4" />
+                  <circle 
+                    cx="32" 
+                    cy="32" 
+                    r="28" 
+                    fill="none" 
+                    stroke="var(--accent-cyan)" 
+                    strokeWidth="4" 
+                    strokeDasharray={175.9}
+                    strokeDashoffset={175.9 - (175.9 * Math.min(100, (session.karmaXP / 500) * 100)) / 100}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center font-mono text-[9px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {session.karmaXP} XP
+                </div>
+              </div>
+            </div>
+
+            {/* Badges credentials */}
+            <div className="space-y-2">
+              <span className="text-[9px] font-mono uppercase tracking-wider block font-semibold" style={{ color: 'var(--text-muted)' }}>
+                System Badges
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all" style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-secondary)',
+                  opacity: session.karmaXP >= 100 ? 1 : 0.4
+                }}>
+                  <Award className="w-4 h-4" style={{ color: session.karmaXP >= 100 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
                   <div>
-                    <h4 className="text-xs font-bold text-zinc-200 font-mono">{session.username}</h4>
-                    <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-550">
-                      Tier-02 Civic Hero
-                    </span>
+                    <span className="text-[9.5px] font-bold block" style={{ color: 'var(--text-primary)' }}>Water Watcher</span>
+                    <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>Initial badge unlocked</span>
                   </div>
                 </div>
 
-                {/* Level Progress */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center text-[9px] font-mono">
-                    <span className="text-zinc-500">Progression Level</span>
-                    <span className="text-brand-emerald font-semibold">
-                      {session.karmaXP} / {Math.ceil(session.karmaXP / 500) * 500} XP
-                    </span>
-                  </div>
-                  <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-brand-emerald rounded-full transition-all duration-300"
-                      style={{ width: `${(session.karmaXP % 500) / 5}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Badges Bento Block */}
-              <div className="space-y-2">
-                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 block">
-                  Unlocked Credentials
-                </span>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className={`border p-3 rounded-lg flex flex-col justify-between h-20 transition-all ${
-                    session.karmaXP >= 200 
-                      ? 'border-brand-cyan/20 bg-brand-cyan/[0.01]' 
-                      : 'border-zinc-900 bg-zinc-950/20 opacity-40'
-                  }`}>
-                    <Award className={`w-4 h-4 ${session.karmaXP >= 200 ? 'text-brand-cyan' : 'text-zinc-650'}`} />
-                    <div>
-                      <span className="text-[10px] font-bold text-zinc-200 block truncate">Water Watchdog</span>
-                      <span className="text-[8px] font-mono text-zinc-500">Report/Upvote water issues</span>
-                    </div>
-                  </div>
-
-                  <div className={`border p-3 rounded-lg flex flex-col justify-between h-20 transition-all ${
-                    session.karmaXP >= 300 
-                      ? 'border-brand-emerald/20 bg-brand-emerald/[0.01]' 
-                      : 'border-zinc-900 bg-zinc-950/20 opacity-40'
-                  }`}>
-                    <Award className={`w-4 h-4 ${session.karmaXP >= 300 ? 'text-brand-emerald' : 'text-zinc-650'}`} />
-                    <div>
-                      <span className="text-[10px] font-bold text-zinc-200 block truncate">Infrastructure Guard</span>
-                      <span className="text-[8px] font-mono text-zinc-500">Report structural defects</span>
-                    </div>
-                  </div>
-
-                  <div className={`border p-3 rounded-lg flex flex-col justify-between h-20 transition-all ${
-                    session.karmaXP >= 400 
-                      ? 'border-brand-amber/20 bg-brand-amber/[0.01]' 
-                      : 'border-zinc-900 bg-zinc-950/20 opacity-40'
-                  }`}>
-                    <Award className={`w-4 h-4 ${session.karmaXP >= 400 ? 'text-brand-amber' : 'text-zinc-650'}`} />
-                    <div>
-                      <span className="text-[10px] font-bold text-zinc-200 block truncate">Citizen Shield</span>
-                      <span className="text-[8px] font-mono text-zinc-500">High-priority triage sync</span>
-                    </div>
-                  </div>
-
-                  <div className={`border p-3 rounded-lg flex flex-col justify-between h-20 transition-all ${
-                    session.karmaXP >= 500 
-                      ? 'border-zinc-700 bg-zinc-800/[0.05]' 
-                      : 'border-zinc-900 bg-zinc-950/20 opacity-40'
-                  }`}>
-                    <Award className="w-4 h-4 text-zinc-650" />
-                    <div>
-                      <span className="text-[10px] font-bold text-zinc-200 block truncate">Urban Vanguard</span>
-                      <span className="text-[8px] font-mono text-zinc-500">Unlock custom civic bounties</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* XP Ledger History */}
-              <div className="bg-zinc-950/50 border border-zinc-900 rounded-lg p-3 space-y-2">
-                <span className="text-[8px] font-mono uppercase tracking-wider text-zinc-500 block">
-                  XP Transaction Log
-                </span>
-                <div className="space-y-1.5 text-[9px] font-mono text-zinc-400">
-                  <div className="flex justify-between items-center border-b border-zinc-900/60 pb-1">
-                    <span>AI Report Validated</span>
-                    <span className="text-brand-emerald">+50 XP</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-zinc-900/60 pb-1">
-                    <span>Upvote Registered</span>
-                    <span className="text-brand-emerald">+10 XP</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Session Connected</span>
-                    <span className="text-zinc-600">CONNECTED</span>
+                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all" style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-secondary)',
+                  opacity: session.karmaXP >= 220 ? 1 : 0.4
+                }}>
+                  <Award className="w-4 h-4" style={{ color: session.karmaXP >= 220 ? 'var(--accent-amber)' : 'var(--text-muted)' }} />
+                  <div>
+                    <span className="text-[9.5px] font-bold block" style={{ color: 'var(--text-primary)' }}>Infrastructure Guard</span>
+                    <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>Active reporter status</span>
                   </div>
                 </div>
               </div>
             </div>
-          )}
 
+            {/* XP log audit timeline */}
+            <div className="border rounded-lg p-3 space-y-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+              <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                XP TRANSACTION TIMELINE LOGS
+              </span>
+              <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                {karmaTransactions.map(tx => (
+                  <div key={tx.id} className="flex justify-between items-center text-[9px] font-mono border-b pb-1 last:border-0 last:pb-0" style={{ borderColor: 'var(--border-secondary)' }}>
+                    <div className="flex flex-col">
+                      <span style={{ color: 'var(--text-primary)' }}>{tx.msg}</span>
+                      <span className="text-[7.5px]" style={{ color: 'var(--text-muted)' }}>{tx.time}</span>
+                    </div>
+                    <span className="font-bold" style={{ color: tx.xp.includes('+') ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
+                      {tx.xp}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Verification slider drawer */}
+      {selectedBounty && (
+        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col justify-end">
+          <div className="border-t p-4 space-y-4 max-h-[90%] overflow-y-auto" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+            <div className="flex justify-between items-center border-b pb-2" style={{ borderColor: 'var(--border-secondary)' }}>
+              <span className="text-[9px] font-mono text-zinc-550">{selectedBounty.id} // CONSENSUS</span>
+              <button onClick={() => setSelectedBounty(null)} className="cursor-pointer" style={{ color: 'var(--text-primary)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{selectedBounty.category}</h4>
+              <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{selectedBounty.location}</p>
+              <div className="p-2.5 border rounded text-[10px] leading-relaxed font-sans" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}>
+                {selectedBounty.description || 'No description notes.'}
+              </div>
+            </div>
+
+            {/* Selfie Verification */}
+            {selectedBounty.status === 'Peer_Review' && (
+              <div className="border rounded-lg p-3 space-y-3" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)' }}>
+                <div className="flex justify-between items-center text-[9px] font-mono font-bold" style={{ color: 'var(--accent-cyan)' }}>
+                  <span>SELFIE CONFIRMATION HANDSHAKE</span>
+                  <span className="animate-pulse">{(selectedBounty.verifications || []).length}/3 SIGNED</span>
+                </div>
+
+                {handshakeStep === 'idle' && (
+                  <button 
+                    type="button" 
+                    onClick={startHandshake}
+                    className="w-full py-1.5 font-bold font-mono text-[9px] uppercase rounded cursor-pointer"
+                    style={{ backgroundColor: 'var(--accent-cyan)', color: 'var(--bg-primary)' }}
+                  >
+                    Cast Verification Signature
+                  </button>
+                )}
+
+                {handshakeStep === 'streaming' && (
+                  <div className="relative rounded overflow-hidden h-36 bg-black flex flex-col justify-end">
+                    <video ref={handshakeVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="relative z-10 p-1.5 bg-zinc-950/90 flex justify-between items-center text-[8px] font-mono">
+                      <span className="text-brand-cyan animate-pulse">SELFIE SCAN ACTIVE</span>
+                      <button 
+                        type="button" 
+                        onClick={() => snapHandshake(selectedBounty.id)}
+                        className="bg-brand-cyan text-zinc-950 px-2 py-0.5 rounded font-mono font-bold cursor-pointer"
+                      >
+                        Confirm Match
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {handshakeStep === 'countdown' && (
+                  <div className="h-28 flex flex-col items-center justify-center text-center">
+                    <span className="text-2xl font-mono font-bold animate-ping" style={{ color: 'var(--accent-cyan)' }}>{handshakeCountdown}</span>
+                    <p className="text-[8px] font-mono text-zinc-550 mt-1">GENERATING SECURE HASH BLOCK...</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedBounty.progressPhoto && (
+              <div className="space-y-1">
+                <span className="text-[8px] font-mono uppercase tracking-widest block font-semibold" style={{ color: 'var(--text-muted)' }}>Contractor Submission Photo</span>
+                <div className="w-full h-24 rounded overflow-hidden border" style={{ borderColor: 'var(--border-secondary)' }}>
+                  <img src={selectedBounty.progressPhoto} alt="Progress completion evidence" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => {
+                onUpvoteIncident(selectedBounty.id);
+                onUpdateKarma(10);
+                addKarmaLog(`Cast Consensus Upvote: ${selectedBounty.id}`, '+10 XP');
+                setSelectedBounty(prev => prev ? { ...prev, upvotes: prev.upvotes + 1 } : null);
+              }}
+              className="w-full py-1.5 border rounded text-[9.5px] font-mono cursor-pointer transition-colors"
+              style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+            >
+              Upvote Issue ({selectedBounty.upvotes} Votes)
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Device Bottom Tab Navigation */}
-        <div className="h-14 bg-zinc-950 border-t border-zinc-900 grid grid-cols-3 shrink-0">
-          <button
-            onClick={() => setActiveTab('map')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'map' ? 'text-brand-cyan' : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-          >
-            <MapPin className="w-4 h-4" />
-            <span className="text-[8px] font-mono uppercase tracking-widest">Map</span>
-          </button>
+      {/* Footer Navigation Bar */}
+      <div className="absolute bottom-0 inset-x-0 h-14 border-t grid grid-cols-3 z-35 select-none" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+        <button
+          onClick={() => { setActiveTab('marketplace'); setSelectedBounty(null); stopCamera(); }}
+          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all animate-pulse"
+          style={{ color: activeTab === 'marketplace' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
+        >
+          <Coins className="w-4 h-4" />
+          <span className="text-[8px] font-mono uppercase font-bold tracking-widest">Market</span>
+        </button>
 
-          <button
-            onClick={() => setActiveTab('report')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'report' ? 'text-brand-cyan' : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            <span className="text-[8px] font-mono uppercase tracking-widest">Report</span>
-          </button>
+        <button
+          onClick={() => { setActiveTab('report'); setSelectedBounty(null); startCamera(); }}
+          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all animate-pulse"
+          style={{ color: activeTab === 'report' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
+        >
+          <Camera className="w-4 h-4" />
+          <span className="text-[8px] font-mono uppercase font-bold tracking-widest">Report</span>
+        </button>
 
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'profile' ? 'text-brand-cyan' : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span className="text-[8px] font-mono uppercase tracking-widest">Karma</span>
-          </button>
-        </div>
-
-        {/* Device Virtual Home Button Bar */}
-        <div className="h-4 bg-zinc-950 flex justify-center items-center shrink-0">
-          <div className="w-32 h-1 bg-zinc-800 rounded-full" />
-        </div>
-
+        <button
+          onClick={() => { setActiveTab('ledger'); setSelectedBounty(null); stopCamera(); }}
+          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all"
+          style={{ color: activeTab === 'ledger' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
+        >
+          <Award className="w-4 h-4" />
+          <span className="text-[8px] font-mono uppercase font-bold tracking-widest">Karma</span>
+        </button>
       </div>
     </div>
   );

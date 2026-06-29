@@ -19,11 +19,13 @@ export interface Incident {
   location: string;
   coordinates: [number, number]; // [x, y] representing map grid position (0-100 values)
   severity: 'Critical' | 'Moderate' | 'Low';
-  status: 'Triage' | 'Bounty_Posted' | 'Claimed_In_Progress' | 'Peer_Review' | 'Resolved' | 'Archived';
+  status: 'Triage' | 'Bounty_Posted' | 'Claimed_In_Progress' | 'Peer_Review' | 'Resolved';
   upvotes: number;
-  image: string;
-  timestamp: string;
-  mergedCount: number;
+  description: string;
+  languageBadge: string | null;
+  image?: string;
+  timestamp?: string;
+  mergedCount?: number;
   notes?: string;
   geolocation?: {
     lat: number;
@@ -39,6 +41,7 @@ export interface Incident {
     chronosEta: string;
   };
   claimedBy?: string;
+  contractorStage?: 'Accepted' | 'Dispatched' | 'In-Review';
   etaTargetTime?: number;
   progressPhoto?: string;
   verifications?: VerificationLog[];

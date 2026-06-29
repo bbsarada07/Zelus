@@ -1,20 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Incident, Theme } from '../types';
 import { 
   AlertTriangle, 
   MapPin, 
-  TrendingUp, 
   CheckCircle2, 
-  Clock, 
   Layers, 
-  Flame, 
-  CloudLightning,
   X,
   ShieldCheck,
   Wrench,
   Send,
-  Hourglass,
-  Coins
+  Cpu,
+  Laptop,
+  Terminal,
+  Activity,
+  Smartphone,
+  QrCode
 } from 'lucide-react';
 
 interface GovernmentDashboardProps {
@@ -23,7 +23,9 @@ interface GovernmentDashboardProps {
   weatherRiskMultiplier: number;
   onAddIncident: (incident: Omit<Incident, 'id' | 'timestamp' | 'mergedCount'>) => void;
   theme?: Theme;
-  onSelectPayload?: (incident: Incident) => void;
+  onLogout: () => void;
+  onToggleTheme: () => void;
+  username: string;
 }
 
 export const GovernmentDashboard: React.FC<GovernmentDashboardProps> = ({ 
@@ -31,711 +33,703 @@ export const GovernmentDashboard: React.FC<GovernmentDashboardProps> = ({
   onAuthorizeDispatch, 
   weatherRiskMultiplier,
   onAddIncident,
-  theme: _theme = 'dark',
-  onSelectPayload,
+  onLogout,
+  onToggleTheme,
+  username
 }) => {
-  const [lastIncidentsCount, setLastIncidentsCount] = React.useState(incidents.length);
-  const [newIncidentToast, setNewIncidentToast] = React.useState<Incident | null>(null);
-  const [selectedIncidentRow, setSelectedIncidentRow] = React.useState<Incident | null>(null);
 
-  React.useEffect(() => {
-    if (incidents.length > lastIncidentsCount) {
-      // New incident captured in state! Show live flashing authority overlay toast
-      const latestIncident = incidents[0];
-      setNewIncidentToast(latestIncident);
-      const timer = setTimeout(() => {
-        setNewIncidentToast(null);
-      }, 5000);
-      setLastIncidentsCount(incidents.length);
-      return () => clearTimeout(timer);
-    } else if (incidents.length !== lastIncidentsCount) {
-      setLastIncidentsCount(incidents.length);
-    }
-  }, [incidents, lastIncidentsCount]);
+  // Selected incident for Center Swarm command view
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  
+  // Swarm command sequence animation
+  const [swarmStep, setSwarmStep] = useState<number>(0);
+  const [swarmAnimating, setSwarmAnimating] = useState<boolean>(false);
 
-  // Real-Time Live Traffic Simulation loop (Autonomously inject reports every 15s)
-  React.useEffect(() => {
-    const trafficPresets = [
-      { category: "Road & Structural Damage", notes: "Power Outage at 8th Boulevard and street intersection.", location: "8th Boulevard & Elm St" },
-      { category: "Road & Structural Damage", notes: "Damaged Guardrail at Highway 10. High-risk highway divider crack.", location: "Highway 10 (Mile Marker 45)" },
-      { category: "Water Outage & Flooding", notes: "Sewer Line Leak at Oak Street. Minor flooding reported.", location: "Oak Street & W 14th St" },
-      { category: "Utility & Spark Hazard", notes: "Flickering Grid Node at Elm Junction. Spark risks under rain.", location: "Elm Junction & Pine Lane" },
-      { category: "Road & Structural Damage", notes: "Debris Blockage at Sector-3 Bypass. Pedestrians blocked.", location: "Sector-3 Bypass Road" },
-      { category: "Road & Structural Damage", notes: "Pavement Fracture at West Overpass. Major driver speed reduction.", location: "West Overpass Grid 4" },
-      { category: "Utility & Spark Hazard", notes: "Signage Collapse on 12th Avenue. Live wires exposed.", location: "12th Avenue & Broadway" }
-    ];
+  // QR Code Sync Modal State
+  const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'scanning' | 'success'>('idle');
 
-    const interval = setInterval(() => {
-      const randomPreset = trafficPresets[Math.floor(Math.random() * trafficPresets.length)];
-      const xVal = Math.floor(Math.random() * 60) + 20;
-      const yVal = Math.floor(Math.random() * 60) + 20;
-      const latVal = parseFloat((40.7128 + (Math.random() - 0.5) * 0.08).toFixed(6));
-      const lngVal = parseFloat((-74.0060 + (Math.random() - 0.5) * 0.08).toFixed(6));
-      const generatedHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()}`;
+  // Dev Console drawer expanded
+  const [devConsoleOpen, setDevConsoleOpen] = useState<boolean>(false);
+  const [devLogs, setDevLogs] = useState<Array<{ time: string; msg: string; raw?: string }>>([
+    { time: '14:31:02', msg: 'System Bootstrap core nominal. Initialized developer log ledger.' }
+  ]);
 
-      onAddIncident({
-        category: randomPreset.category,
-        location: randomPreset.location,
-        coordinates: [xVal, yVal],
-        severity: Math.random() > 0.5 ? 'Critical' : 'Moderate',
-        status: 'Triage',
-        upvotes: Math.floor(Math.random() * 5) + 1,
-        image: randomPreset.category === "Water Outage & Flooding" ? "/water_main_burst.png" : randomPreset.category === "Utility & Spark Hazard" ? "/downed_power_line.png" : "/road_pothole.png",
-        notes: randomPreset.notes,
-        geolocation: { lat: latVal, lng: lngVal },
-        exifVerified: true,
-        hash: generatedHash
-      });
-    }, 15000);
+  // Threat risk index state
+  const [threatIndex, setThreatIndex] = useState<number>(0.92);
 
-    return () => clearInterval(interval);
-  }, [onAddIncident]);
-  // Stats derivations
-  const activeCount = incidents.filter(inc => inc.status !== 'Resolved' && inc.status !== 'Archived').length;
-  const dispatchedCount = incidents.filter(inc => inc.status === 'Claimed_In_Progress' || inc.status === 'Peer_Review').length;
-  const bountyCount = incidents.filter(inc => inc.status === 'Bounty_Posted').length;
+  // Pulse neon indicators for new reports
+  const [newIncidentIds, setNewIncidentIds] = useState<string[]>([]);
+  const prevIncidentsRef = useRef<Incident[]>(incidents);
 
-  // Custom risk calculator
-  const calculateRiskScore = (inc: Incident) => {
-    let base = 10;
-    if (inc.severity === 'Critical') base = 40;
-    else if (inc.severity === 'Moderate') base = 25;
-
-    const upvoteWeight = inc.upvotes * 1.5;
-    const mergeWeight = inc.mergedCount * 8;
+  useEffect(() => {
+    const prevIds = new Set(prevIncidentsRef.current.map(i => i.id));
+    const added = incidents.filter(i => !prevIds.has(i.id)).map(i => i.id);
     
-    return Math.round((base + upvoteWeight + mergeWeight) * weatherRiskMultiplier);
+    if (added.length > 0) {
+      setNewIncidentIds(prev => [...prev, ...added]);
+      // Remove pulsing neon status after 10 seconds
+      setTimeout(() => {
+        setNewIncidentIds(prev => prev.filter(id => !added.includes(id)));
+      }, 10000);
+    }
+    
+    prevIncidentsRef.current = incidents;
+  }, [incidents]);
+
+  // Fluctuating index simulation
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setThreatIndex(prev => {
+        const delta = (Math.random() - 0.5) * 0.04;
+        return parseFloat(Math.min(1.5, Math.max(0.4, prev + delta)).toFixed(2));
+      });
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Sync /DEV logs from storage when dispatches occur
+  useEffect(() => {
+    const savedWebhooks = localStorage.getItem('zelus_webhooks');
+    if (savedWebhooks) {
+      try {
+        const parsed = JSON.parse(savedWebhooks);
+        if (Array.isArray(parsed)) {
+          const mappedLogs = parsed.map((wh: any) => ({
+            time: wh.timestamp,
+            msg: `[WEBHOOK DISPATCH] ${wh.method} -> ${wh.service} Status ${wh.status}`,
+            raw: wh.payload
+          }));
+          setDevLogs(prev => [...mappedLogs.reverse(), ...prev.slice(-30)]);
+        }
+      } catch { /* ignore */ }
+    }
+  }, [incidents]);
+
+  // Handle row click & trigger Swarm animation
+  const handleSelectIncident = (inc: Incident) => {
+    setSelectedIncident(inc);
+    setSwarmStep(0);
+    setSwarmAnimating(true);
   };
 
-  // Sorting incidents by risk score for Predictive Decay Sidebar
-  const predictiveQueue = [...incidents]
-    .filter(inc => inc.status !== 'Resolved' && inc.status !== 'Archived')
-    .map(inc => ({ ...inc, riskScore: calculateRiskScore(inc) }))
-    .sort((a, b) => b.riskScore - a.riskScore);
+  // Swarm pipeline simulator
+  useEffect(() => {
+    if (!swarmAnimating || !selectedIncident) return;
+    
+    const steps = [
+      {
+        log: `[Aegis-Agent] // Running exif hash verification for ${selectedIncident.id}... CONFIDENCE: 98.6% SUCCESS`,
+        duration: 400
+      },
+      {
+        log: `[Atlas-Agent] // Initiating Gemini spatial routing vectors... GPS Coordinates locked: [Lat ${selectedIncident.geolocation?.lat.toFixed(4) || '40.7128'}, Lng ${selectedIncident.geolocation?.lng.toFixed(4) || '-74.0060'}]. SUCCESS`,
+        duration: 500
+      },
+      {
+        log: `[Helios-Agent] // Estimating material allocation cost thresholds for "${selectedIncident.category}"... Rig deployment dispatched. SUCCESS`,
+        duration: 600
+      },
+      {
+        log: `[Mercury-Agent] // Broadcasted payload to municipal SMS API and GIS overlays. STATUS: 200 OK. SUCCESS`,
+        duration: 400
+      }
+    ];
+
+    let current = 0;
+    const executeStep = () => {
+      if (current < steps.length) {
+        setSwarmStep(current + 1);
+        
+        // Log to dev console too
+        const now = new Date().toLocaleTimeString();
+        setDevLogs(prev => [
+          { time: now, msg: `[SWARM COMMAND] Agent sequence step ${current + 1} completed.`, raw: JSON.stringify(steps[current]) },
+          ...prev
+        ]);
+        
+        current++;
+        setTimeout(executeStep, steps[current - 1].duration);
+      } else {
+        setSwarmAnimating(false);
+        // Fire webhook simulation output if the incident was in triage
+        if (selectedIncident.status === 'Triage') {
+          const now = new Date().toLocaleTimeString();
+          setDevLogs(prev => [
+            { time: now, msg: `[SMS OUTBOUND] [WEBHOOK] SMS dispatched to primary contractor... Destination: +1 (555) ZEL-US26` },
+            { time: now, msg: `[POST] Outbound payload committed to Aegis Security Ledger. 200 OK` },
+            ...prev
+          ]);
+        }
+      }
+    };
+
+    const timer = setTimeout(executeStep, 300);
+    return () => clearTimeout(timer);
+  }, [swarmAnimating, selectedIncident]);
+
+  const activeCount = incidents.filter(i => i.status !== 'Resolved').length;
 
   return (
-    <div className="space-y-6">
-      {/* Real-Time Command Analytics Sparkline Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Metric 1 */}
-        <div className="glass-panel border-zinc-900 rounded-lg p-5 flex flex-col justify-between shadow-xl relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono tracking-wider text-zinc-500 uppercase">
-              Active Regional Incidents
-            </span>
-            <AlertTriangle className="w-4 h-4 text-brand-cyan animate-pulse" />
+    <div className="space-y-6 flex-1 flex flex-col font-sans select-none" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      
+      {/* 1. TOP CONTROL BAR */}
+      <div 
+        className="glass-panel border rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl relative overflow-hidden"
+        style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}
+      >
+        {/* Status Led */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg border flex items-center justify-center relative shrink-0" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+            <Cpu className="w-5 h-5 animate-pulse" style={{ color: 'var(--accent-cyan)' }} />
           </div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-extrabold text-white font-mono">{activeCount}</span>
-            <span className="text-[10px] text-brand-cyan font-mono flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" /> Live Sync
-            </span>
-          </div>
-          {/* Custom Mini Sparkline */}
-          <div className="w-full h-8 mt-2">
-            <svg viewBox="0 0 100 20" className="w-full h-full text-brand-cyan opacity-80 group-hover:opacity-100 transition-opacity">
-              <defs>
-                <linearGradient id="gradient-cyan" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.2"/>
-                  <stop offset="100%" stopColor="#00E5FF" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              <path 
-                d={`M 0 18 Q 20 ${18 - activeCount * 2} 40 ${12 - activeCount} T 80 8 T 100 4`} 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5"
-              />
-              <path 
-                d={`M 0 18 Q 20 ${18 - activeCount * 2} 40 ${12 - activeCount} T 80 8 T 100 4 L 100 20 L 0 20 Z`} 
-                fill="url(#gradient-cyan)"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Metric 2 */}
-        <div className="glass-panel border-zinc-900 rounded-lg p-5 flex flex-col justify-between shadow-xl relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono tracking-wider text-zinc-500 uppercase">
-              Spam Isolation Ratio
-            </span>
-            <Layers className="w-4 h-4 text-brand-emerald" />
-          </div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-extrabold text-white font-mono">94.2%</span>
-            <span className="text-[10px] text-brand-emerald font-mono flex items-center gap-0.5">
-              +1.4% (24h)
-            </span>
-          </div>
-          {/* Custom Mini Sparkline */}
-          <div className="w-full h-8 mt-2">
-            <svg viewBox="0 0 100 20" className="w-full h-full text-brand-emerald opacity-80 group-hover:opacity-100 transition-opacity">
-              <defs>
-                <linearGradient id="gradient-emerald" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00E676" stopOpacity="0.2"/>
-                  <stop offset="100%" stopColor="#00E676" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              <path 
-                d="M 0 15 Q 15 12 30 14 T 60 8 T 85 5 T 100 2" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5"
-              />
-              <path 
-                d="M 0 15 Q 15 12 30 14 T 60 8 T 85 5 T 100 2 L 100 20 L 0 20 Z" 
-                fill="url(#gradient-emerald)"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="glass-panel border-zinc-900 rounded-lg p-5 flex flex-col justify-between shadow-xl relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono tracking-wider text-zinc-500 uppercase">
-              Average Dispatch Delta
-            </span>
-            <Clock className="w-4 h-4 text-brand-amber" />
-          </div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-extrabold text-white font-mono">14.0 Mins</span>
-            <span className="text-[10px] text-brand-amber font-mono flex items-center gap-0.5">
-              -3.2 Mins
-            </span>
-          </div>
-          {/* Custom Mini Sparkline */}
-          <div className="w-full h-8 mt-2">
-            <svg viewBox="0 0 100 20" className="w-full h-full text-brand-amber opacity-80 group-hover:opacity-100 transition-opacity">
-              <defs>
-                <linearGradient id="gradient-amber" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FF9100" stopOpacity="0.2"/>
-                  <stop offset="100%" stopColor="#FF9100" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              <path 
-                d="M 0 5 Q 20 8 40 4 T 70 12 T 100 16" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5"
-              />
-              <path 
-                d="M 0 5 Q 20 8 40 4 T 70 12 T 100 16 L 100 20 L 0 20 Z" 
-                fill="url(#gradient-amber)"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Dashboard Workspace layout (Split screen sidebar + table) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        
-        {/* Geospatial Clustering Triage Engine: TABULAR LIST (8 cols) */}
-        <div className="lg:col-span-8 glass-panel border-zinc-900 rounded-lg p-5 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight text-white flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-brand-cyan" />
-                Geospatial Clustering Triage Engine
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold font-mono tracking-wider text-white uppercase">
+                ZELUS MUNICIPAL GATEWAY // ADMIN
               </h2>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
-                Live incoming reports clustered dynamically by geospatial coordinates
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 border border-zinc-900 px-2 py-0.5 rounded">
-                Triage queue: {incidents.filter(i => i.status === 'Triage').length}
-              </span>
-              <span className="text-[10px] font-mono text-brand-cyan bg-brand-cyan/5 border border-brand-cyan/25 px-2 py-0.5 rounded">
-                Active Bounties: {bountyCount}
-              </span>
-              <span className="text-[10px] font-mono text-brand-amber bg-brand-amber/5 border border-brand-amber/25 px-2 py-0.5 rounded">
-                Active Claims: {dispatchedCount}
+              <span className="flex items-center gap-1 text-[9px] font-mono border px-2 py-0.5 rounded-full font-extrabold animate-pulse" style={{
+                backgroundColor: 'rgba(0, 255, 204, 0.1)',
+                borderColor: 'var(--accent-cyan)',
+                color: 'var(--accent-cyan)'
+              }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                SYSTEM: NOMINAL
               </span>
             </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-zinc-900 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-                  <th className="py-2.5 px-3">Ticket ID / Category</th>
-                  <th className="py-2.5 px-3">Location</th>
-                  <th className="py-2.5 px-3 text-center">Severity</th>
-                  <th className="py-2.5 px-3 text-center">State</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-900/60 text-xs">
-                {incidents.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-zinc-500 font-mono">
-                      [NO INCIDENTS REGISTERED ON THE LEDGER]
-                    </td>
-                  </tr>
-                ) : (
-                  incidents.map((incident) => (
-                    <tr 
-                      key={incident.id} 
-                      className="hover:bg-zinc-900/35 transition-colors group cursor-pointer"
-                      onClick={() => {
-                        setSelectedIncidentRow(incident);
-                        if (onSelectPayload) onSelectPayload(incident);
-                      }}
-                    >
-                      <td className="py-3 px-3">
-                        <div className="flex flex-col">
-                          <span className="font-mono text-[10px] text-zinc-400 flex items-center gap-1.5">
-                            {incident.id}
-                            {incident.mergedCount > 1 && (
-                              <span className="text-[9px] bg-brand-cyan/10 border border-brand-cyan/20 text-brand-cyan px-1.5 rounded-full font-mono scale-90">
-                                Clustered: {incident.mergedCount} Reports Merged
-                              </span>
-                            )}
-                          </span>
-                          <span className="font-semibold text-zinc-200 mt-0.5">
-                            {incident.category}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-zinc-400 font-mono">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-zinc-650 flex-shrink-0" />
-                            <span className="truncate max-w-[150px] font-semibold text-zinc-200">{incident.location}</span>
-                          </div>
-                          <span className="text-[9px] text-brand-cyan/85 mt-0.5 ml-4">
-                            {incident.geolocation 
-                              ? `${incident.geolocation.lat.toFixed(5)}°, ${incident.geolocation.lng.toFixed(5)}°` 
-                              : `${(40.7128 + (incident.coordinates?.[0] || 0) * 0.001).toFixed(5)}°, ${(-74.0060 - (incident.coordinates?.[1] || 0) * 0.001).toFixed(5)}°`
-                            }
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono border font-semibold inline-block ${
-                          incident.severity === 'Critical' 
-                            ? 'bg-red-950/20 text-red-400 border-red-900/50' 
-                            : incident.severity === 'Moderate'
-                            ? 'bg-brand-amber/5 text-brand-amber border-brand-amber/25'
-                            : 'bg-zinc-900 text-zinc-400 border-zinc-850'
-                        }`}>
-                          {incident.severity}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono border inline-block uppercase font-semibold ${
-                          incident.status === 'Triage' 
-                            ? 'bg-brand-cyan/5 text-brand-cyan border-brand-cyan/25 animate-pulse-cyan' 
-                            : incident.status === 'Bounty_Posted'
-                            ? 'bg-purple-950/20 text-purple-400 border-purple-900/30'
-                            : incident.status === 'Claimed_In_Progress'
-                            ? 'bg-brand-amber/5 text-brand-amber border-brand-amber/25 animate-pulse-amber'
-                            : incident.status === 'Peer_Review'
-                            ? 'bg-blue-950/20 text-blue-400 border-blue-900/30'
-                            : incident.status === 'Resolved'
-                            ? 'bg-brand-emerald/5 text-brand-emerald border-brand-emerald/25'
-                            : 'bg-zinc-900/40 text-zinc-500 border-zinc-800'
-                        }`}>
-                          {incident.status.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        {incident.status === 'Triage' ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onAuthorizeDispatch(incident.id);
-                              if (selectedIncidentRow && selectedIncidentRow.id === incident.id) {
-                                setSelectedIncidentRow(prev => prev ? { ...prev, status: 'Bounty_Posted' } : null);
-                              }
-                            }}
-                            className="bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-semibold px-2.5 py-1.5 rounded text-[10px] font-mono tracking-tight flex items-center gap-1.5 ml-auto cursor-pointer shadow-[0_0_8px_rgba(0,229,255,0.2)] hover:shadow-[0_0_15px_rgba(0,229,255,0.4)] transition-all"
-                          >
-                            <Coins className="w-3 h-3" />
-                            Post Civic Bounty
-                          </button>
-                        ) : incident.status === 'Bounty_Posted' ? (
-                          <span className="text-[10px] text-purple-400 font-mono flex items-center justify-end gap-1.5">
-                            <Coins className="w-3.5 h-3.5" />
-                            Bounty Open
-                          </span>
-                        ) : incident.status === 'Claimed_In_Progress' ? (
-                          <span className="text-[10px] text-brand-amber font-mono flex items-center justify-end gap-1.5">
-                            <Clock className="w-3.5 h-3.5 animate-spin" />
-                            Claimed / Progress
-                          </span>
-                        ) : incident.status === 'Peer_Review' ? (
-                          <span className="text-[10px] text-blue-400 font-mono flex items-center justify-end gap-1.5">
-                            <ShieldCheck className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-                            In Peer Review
-                          </span>
-                        ) : incident.status === 'Resolved' ? (
-                          <span className="text-[10px] text-brand-emerald font-mono flex items-center justify-end gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Resolved
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-zinc-500 font-mono flex items-center justify-end gap-1.5">
-                            <X className="w-3.5 h-3.5" />
-                            Archived
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Predictive Decay Indexing Queue: SIDEBAR FEED (4 cols) */}
-        <div className="lg:col-span-4 glass-panel border-zinc-900 rounded-lg p-5 space-y-4 shadow-xl">
-          <div className="border-b border-zinc-900 pb-3 flex flex-col gap-1">
-            <h2 className="text-sm font-semibold tracking-tight text-white flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-brand-amber" />
-              Predictive Decay Indexing
-            </h2>
-            <p className="text-[11px] text-zinc-500 leading-normal">
-              Active structural risks ordered dynamically by atmospheric weather coefficient.
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Operator terminal authenticated as: <strong className="text-zinc-200">{username}</strong>
             </p>
           </div>
+        </div>
 
-          {/* Current multiplier status indicator */}
-          <div className="bg-zinc-950/80 border border-zinc-900 rounded p-3 flex items-center gap-3">
-            <div className={`p-2 rounded ${weatherRiskMultiplier > 1.2 ? 'bg-brand-amber/10 border border-brand-amber/20 text-brand-amber' : 'bg-brand-cyan/10 border border-brand-cyan/20 text-brand-cyan'}`}>
-              <CloudLightning className="w-4 h-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between text-[10px] font-mono">
-                <span className="text-zinc-400">Weather Multiplier</span>
-                <span className={weatherRiskMultiplier > 1.2 ? 'text-brand-amber font-bold' : 'text-brand-cyan'}>
-                  x{weatherRiskMultiplier.toFixed(2)}
-                </span>
-              </div>
-              <p className="text-[9px] text-zinc-550 truncate mt-0.5">
-                {weatherRiskMultiplier > 1.2 
-                  ? 'Severe storm forecast: accelerated infrastructure wear' 
-                  : 'Atmospheric conditions standard: baseline wear'
-                }
-              </p>
-            </div>
+        {/* Live diagnostics */}
+        <div className="flex flex-wrap items-center gap-5 text-[10px] font-mono">
+          <div className="flex flex-col">
+            <span style={{ color: 'var(--text-muted)' }}>ACTIVE NODE FEED</span>
+            <span className="text-xs font-bold text-zinc-100">1,482 NODES ONLINE</span>
           </div>
-
-          {/* Sidebar Feed Cards */}
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-            {predictiveQueue.length === 0 ? (
-              <div className="text-center py-6 text-zinc-650 font-mono text-[10px]">
-                [NO PENDING RISKS REGISTERED]
-              </div>
-            ) : (
-              predictiveQueue.map((item) => (
-                <div 
-                  key={item.id} 
-                  className="bg-zinc-950/40 border border-zinc-900/80 hover:border-zinc-850 rounded p-3.5 space-y-2.5 transition-colors relative overflow-hidden group"
-                >
-                  {/* Top indicator containing index badge */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-mono text-zinc-500">
-                      {item.id} // {item.timestamp}
-                    </span>
-                    <div className="flex items-center gap-1 bg-red-950/10 border border-red-900/30 rounded px-1.5 py-0.5 text-[9px] font-mono font-bold text-red-400">
-                      <Flame className="w-2.5 h-2.5 fill-current animate-pulse" />
-                      Index: {item.riskScore}
-                    </div>
-                  </div>
-
-                  {/* Incident Info */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
-                      {item.category}
-                    </h4>
-                    <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-2.5 h-2.5" />
-                      {item.location}
-                    </p>
-                  </div>
-
-                  {/* Index progress bar */}
-                  <div className="space-y-1">
-                    <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          item.riskScore > 65 
-                            ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' 
-                            : item.riskScore > 40
-                            ? 'bg-brand-amber'
-                            : 'bg-brand-cyan'
-                        }`}
-                        style={{ width: `${Math.min(100, item.riskScore)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+          <div className="h-6 w-px" style={{ backgroundColor: 'var(--border-secondary)' }} />
+          
+          <div className="flex flex-col">
+            <span style={{ color: 'var(--text-muted)' }}>THREAT RISK LEVEL</span>
+            <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--accent-red)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 fill-current animate-bounce" />
+              {threatIndex.toFixed(2)} Index
+            </span>
+          </div>
+          <div className="h-6 w-px" style={{ backgroundColor: 'var(--border-secondary)' }} />
+          
+          <div className="flex flex-col">
+            <span style={{ color: 'var(--text-muted)' }}>WEATHER wear MULTIPLIER</span>
+            <span className="text-xs font-bold" style={{ color: 'var(--accent-amber)' }}>
+              x{weatherRiskMultiplier.toFixed(2)} Coefficient
+            </span>
           </div>
         </div>
 
+        {/* Sync Device Bridge Button & Actions */}
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => { setShowSyncModal(true); setSyncStatus('idle'); }}
+            className="px-3 py-1.5 rounded border text-[10px] font-mono tracking-wider font-bold transition-all hover:bg-zinc-800/10 cursor-pointer flex items-center gap-1.5"
+            style={{ borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            Sync Device
+          </button>
+          
+          <button 
+            onClick={onToggleTheme}
+            className="p-2 rounded border hover:bg-zinc-850 cursor-pointer"
+            style={{ borderColor: 'var(--border-secondary)' }}
+          >
+            <Smartphone className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
+          </button>
+
+          <button 
+            onClick={onLogout}
+            className="px-3 py-1.5 rounded bg-zinc-900 border text-[10px] font-mono font-bold hover:bg-red-500/15 hover:border-red-500/40 text-red-400 cursor-pointer"
+            style={{ borderColor: 'var(--border-secondary)' }}
+          >
+            Disconnect
+          </button>
+        </div>
       </div>
 
-      {/* Sidebar Detail Slide-over Panel */}
-      {selectedIncidentRow && (
-        <>
-          {/* Backdrop overlay */}
-          <div 
-            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity cursor-pointer"
-            onClick={() => setSelectedIncidentRow(null)}
-          />
+      {/* 2. THREE-PANE DESKTOP WORKSPACE LAYOUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 min-h-[500px]">
+        
+        {/* LEFT PANEL: GEOSPATIAL TRIAGE ENGINE (4 Columns) */}
+        <div 
+          className="lg:col-span-4 border rounded-xl p-4 flex flex-col justify-between shadow-xl min-h-[500px] overflow-hidden"
+          style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}
+        >
+          <div className="space-y-4">
+            <div className="border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
+              <h3 className="text-xs font-bold font-mono tracking-wider uppercase text-white flex items-center gap-1.5">
+                <Layers className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
+                Geospatial Triage Engine
+              </h3>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Clustered incoming tickets waiting for municipal authorization.
+              </p>
+            </div>
 
-          {/* Drawer content container */}
-          <div className="fixed top-0 right-0 h-full w-full sm:w-96 z-50 bg-[#050505] border-l border-zinc-900 shadow-2xl p-6 overflow-y-auto flex flex-col justify-between font-sans text-zinc-150 backdrop-blur-md animate-slide-left">
-            <div className="space-y-6">
+            {/* Ticket items list */}
+            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {incidents.length === 0 ? (
+                <div className="text-center py-12 text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  [NO ACTIVE TICKETS SUBMITTED]
+                </div>
+              ) : (
+                incidents.map(inc => {
+                  const isSelected = selectedIncident?.id === inc.id;
+                  const isNew = newIncidentIds.includes(inc.id);
+                  return (
+                    <div 
+                      key={inc.id}
+                      onClick={() => handleSelectIncident(inc)}
+                      className={`border p-3 rounded-lg cursor-pointer transition-all hover:scale-[1.01] relative ${
+                        isNew ? 'animate-pulse' : ''
+                      }`}
+                      style={{ 
+                        backgroundColor: isSelected ? 'var(--bg-secondary)' : 'rgba(9, 15, 16, 0.25)', 
+                        borderColor: isSelected ? 'var(--accent-cyan)' : isNew ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                        boxShadow: isNew ? '0 0 10px rgba(0, 255, 204, 0.45)' : 'none'
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                          {inc.id}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isNew && (
+                            <span className="px-1.5 py-0.2 rounded text-[7.5px] font-mono border font-extrabold" style={{
+                              backgroundColor: 'rgba(0, 255, 204, 0.1)',
+                              borderColor: 'var(--accent-cyan)',
+                              color: 'var(--accent-cyan)'
+                            }}>
+                              NEW COMPLAINT
+                            </span>
+                          )}
+                          <span className="px-1.5 py-0.2 rounded text-[7.5px] font-mono border font-bold" style={{
+                            backgroundColor: inc.severity === 'Critical' ? 'rgba(255,59,48,0.1)' : 'rgba(255,204,0,0.1)',
+                            borderColor: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)',
+                            color: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)'
+                          }}>
+                            {inc.severity}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h4 className="text-xs font-bold mt-1" style={{ color: 'var(--text-primary)' }}>{inc.category}</h4>
+                      <p className="text-[9.5px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{inc.location}</p>
+
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t text-[8px] font-mono" style={{ borderColor: 'var(--border-secondary)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          GRID: X:{inc.coordinates[0]} Y:{inc.coordinates[1]}
+                        </span>
+                        <span style={{ color: 'var(--accent-cyan)' }}>
+                          STATUS: {inc.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Quick injection buttons */}
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-secondary)' }}>
+            <button 
+              onClick={() => {
+                onAddIncident({
+                  category: 'Critical Infrastructure Failure',
+                  location: 'Zone-1 Main Transformers',
+                  coordinates: [72.1, 41.5],
+                  severity: 'Critical',
+                  status: 'Triage',
+                  upvotes: 4,
+                  image: '/downed_power_line.png',
+                  notes: 'High severity grid node failure causing local sparks and blackout threats.',
+                  description: 'High severity grid node failure causing local sparks and blackout threats.',
+                  languageBadge: null,
+                  geolocation: { lat: 40.716, lng: -74.002 }
+                });
+              }}
+              className="py-1 text-[8.5px] font-mono rounded border border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10 cursor-pointer"
+            >
+              + Inject Critical
+            </button>
+            <button 
+              onClick={() => {
+                onAddIncident({
+                  category: 'Road & Structural Damage',
+                  location: 'Subway Exit Junction 4',
+                  coordinates: [38.2, 59.1],
+                  severity: 'Moderate',
+                  status: 'Triage',
+                  upvotes: 1,
+                  image: '/road_pothole.png',
+                  notes: 'Tarmac structural fracture causing pedestrian routing vectors blockage.',
+                  description: 'Tarmac structural fracture causing pedestrian routing vectors blockage.',
+                  languageBadge: null,
+                  geolocation: { lat: 40.710, lng: -74.011 }
+                });
+              }}
+              className="py-1 text-[8.5px] font-mono rounded border text-zinc-300 hover:bg-zinc-800/10 cursor-pointer"
+              style={{ borderColor: 'var(--border-secondary)' }}
+            >
+              + Inject Ambient
+            </button>
+          </div>
+        </div>
+
+        {/* CENTER PANEL: DYNAMIC SWARM COMMAND OVERLAY (5 Columns) */}
+        <div 
+          className="lg:col-span-5 border rounded-xl p-4 flex flex-col justify-between shadow-xl min-h-[500px] relative overflow-hidden"
+          style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}
+        >
+          {selectedIncident ? (
+            <div className="flex-1 flex flex-col justify-between space-y-4 h-full">
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
+              <div className="border-b pb-3 flex justify-between items-center" style={{ borderColor: 'var(--border-secondary)' }}>
                 <div>
-                  <span className="text-[10px] font-mono text-zinc-550">{selectedIncidentRow.id} // LEDGER DATA</span>
-                  <h3 className="text-sm font-bold text-white uppercase mt-0.5 tracking-tight">{selectedIncidentRow.category}</h3>
+                  <h3 className="text-xs font-bold font-mono tracking-wider uppercase text-white flex items-center gap-1.5">
+                    <Terminal className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
+                    [ZELUS-ORCHESTRATOR] // SWARM MODULE
+                  </h3>
+                  <span className="text-[9px] font-mono text-zinc-500">TRIAGING TICKET: {selectedIncident.id}</span>
                 </div>
                 <button 
-                  onClick={() => setSelectedIncidentRow(null)}
-                  className="p-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white cursor-pointer"
+                  onClick={() => setSelectedIncident(null)} 
+                  className="p-1 rounded hover:bg-zinc-850 cursor-pointer"
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Status and Severity badges */}
-              <div className="flex gap-2">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-mono border font-semibold inline-block ${
-                  selectedIncidentRow.severity === 'Critical' 
-                    ? 'bg-red-950/20 text-red-400 border-red-900/50' 
-                    : 'bg-brand-amber/5 text-brand-amber border-brand-amber/25'
-                }`}>
-                  Severity: {selectedIncidentRow.severity}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-mono border inline-block uppercase font-semibold ${
-                  selectedIncidentRow.status === 'Triage' 
-                    ? 'bg-brand-cyan/5 text-brand-cyan border-brand-cyan/25 animate-pulse-cyan' 
-                    : selectedIncidentRow.status === 'Bounty_Posted'
-                    ? 'bg-purple-950/20 text-purple-400 border-purple-900/30'
-                    : selectedIncidentRow.status === 'Claimed_In_Progress'
-                    ? 'bg-brand-amber/5 text-brand-amber border-brand-amber/25 animate-pulse-amber'
-                    : selectedIncidentRow.status === 'Peer_Review'
-                    ? 'bg-blue-950/20 text-blue-400 border-blue-900/30'
-                    : selectedIncidentRow.status === 'Resolved'
-                    ? 'bg-brand-emerald/5 text-brand-emerald border-brand-emerald/25'
-                    : 'bg-zinc-900/40 text-zinc-550 border-zinc-800'
-                }`}>
-                  State: {selectedIncidentRow.status.replace(/_/g, ' ')}
-                </span>
-              </div>
-
-              {/* Image if any */}
-              {selectedIncidentRow.image && (
-                <div className="w-full h-36 rounded-lg overflow-hidden border border-zinc-900/80 bg-zinc-950/50 relative">
-                  <img 
-                    src={selectedIncidentRow.image} 
-                    alt={selectedIncidentRow.category}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              {/* Progress image if any */}
-              {selectedIncidentRow.progressPhoto && (
-                <div className="space-y-1 bg-zinc-950/80 border border-brand-cyan/20 p-2.5 rounded">
-                  <span className="text-[9.5px] font-mono text-zinc-400 uppercase tracking-wider block border-b border-zinc-900 pb-1 mb-1 font-semibold">Volunteer Structural Repair Photo</span>
-                  <div className="w-full h-36 rounded-lg overflow-hidden border border-zinc-905 bg-zinc-950 relative">
-                    <img 
-                      src={selectedIncidentRow.progressPhoto} 
-                      alt="Progress Verification"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Location & GPS coords */}
-              <div className="space-y-1 bg-zinc-950/80 border border-zinc-900 p-3 rounded">
-                <span className="text-[9.5px] font-mono text-zinc-500 uppercase tracking-wider block">Target Coordinates</span>
-                <div className="text-xs text-zinc-200 font-semibold flex items-center gap-1.5 font-sans">
-                  <MapPin className="w-3.5 h-3.5 text-brand-cyan" />
-                  {selectedIncidentRow.location}
-                </div>
-                <div className="text-[10px] font-mono text-brand-cyan/85 pl-5">
-                  GPS: {selectedIncidentRow.geolocation 
-                    ? `${selectedIncidentRow.geolocation.lat.toFixed(6)}°, ${selectedIncidentRow.geolocation.lng.toFixed(6)}°` 
-                    : `${(40.7128 + (selectedIncidentRow.coordinates?.[0] || 0) * 0.001).toFixed(6)}°, ${(-74.0060 - (selectedIncidentRow.coordinates?.[1] || 0) * 0.001).toFixed(6)}°`
-                  }
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-1 bg-zinc-950/80 border border-zinc-900 p-3 rounded">
-                <span className="text-[9.5px] font-mono text-zinc-500 uppercase tracking-wider block">Observations Text</span>
-                <p className="text-xs text-zinc-350 leading-relaxed font-sans">{selectedIncidentRow.notes || 'No description provided.'}</p>
-              </div>
-
-              {/* Multi-Agent Swarm Audit Ledger */}
-              <div className="space-y-2">
-                <span className="text-[9.5px] font-mono text-zinc-550 uppercase tracking-wider block">
-                  Swarm Audit Ledger
-                </span>
+              {/* Agent decision timeline details */}
+              <div className="flex-1 space-y-3 py-2 overflow-y-auto">
                 
-                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                  
-                  {/* Aegis Agent */}
-                  <div className="border border-zinc-900/80 p-2.5 rounded bg-zinc-950/30 font-mono text-[9.5px] text-zinc-450 space-y-1">
-                    <div className="flex items-center justify-between border-b border-zinc-900/60 pb-1 text-zinc-400">
-                      <span className="font-bold flex items-center gap-1.5 text-white">
-                        <ShieldCheck className="w-3.5 h-3.5 text-brand-cyan" />
-                        [Aegis-Agent]
-                      </span>
-                      <span className="text-brand-emerald text-[8px] font-bold">✓ AUTHENTIC</span>
-                    </div>
-                    <p className="text-zinc-300 leading-normal">
-                      {selectedIncidentRow.swarmData?.aegisConfidence || 'Confidence Threshold: 98.6% Authentic (Visual checks passed)'}
-                    </p>
+                {/* 1. Aegis-Agent */}
+                <div className={`p-2.5 rounded border transition-all duration-300 ${
+                  swarmStep >= 1 ? 'border-brand-cyan/20 bg-brand-cyan/[0.01]' : 'border-zinc-900/50 opacity-45'
+                }`}>
+                  <div className="flex items-center justify-between text-[9px] font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" style={{ color: swarmStep >= 1 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
+                      [Aegis-Agent: Fraud/Duplicate Check]
+                    </span>
+                    <span className={swarmStep >= 1 ? 'text-brand-emerald animate-pulse' : 'text-zinc-650'}>
+                      {swarmStep >= 1 ? 'VERIFIED // SUCCESS' : 'STANDBY'}
+                    </span>
                   </div>
-
-                  {/* Atlas Agent */}
-                  <div className="border border-zinc-900/80 p-2.5 rounded bg-zinc-950/30 font-mono text-[9.5px] text-zinc-450 space-y-1">
-                    <div className="flex items-center justify-between border-b border-zinc-900/60 pb-1 text-zinc-400">
-                      <span className="font-bold flex items-center gap-1.5 text-white">
-                        <MapPin className="w-3.5 h-3.5 text-brand-cyan" />
-                        [Atlas-Agent]
-                      </span>
-                      <span className="text-brand-emerald text-[8px] font-bold">✓ ROUTED</span>
-                    </div>
-                    <p className="text-zinc-300 leading-normal">
-                      {selectedIncidentRow.swarmData?.atlasRouting || 'Routing Optimized via Spatial Matrix (Swarm Triangulated)'}
+                  {swarmStep >= 1 && (
+                    <p className="text-[9.5px] font-mono mt-1 text-zinc-350 leading-relaxed">
+                      EXIF photo checksum matched database signatures. Confidence score: 98.6%. Anti-spoof passed.
                     </p>
-                  </div>
-
-                  {/* Vulcan Agent */}
-                  <div className="border border-zinc-900/80 p-2.5 rounded bg-zinc-950/30 font-mono text-[9.5px] text-zinc-450 space-y-1">
-                    <div className="flex items-center justify-between border-b border-zinc-900/60 pb-1 text-zinc-400">
-                      <span className="font-bold flex items-center gap-1.5 text-white">
-                        <Wrench className="w-3.5 h-3.5 text-brand-cyan" />
-                        [Vulcan-Agent]
-                      </span>
-                      <span className="text-brand-emerald text-[8px] font-bold">✓ DISPATCHED</span>
-                    </div>
-                    <p className="text-zinc-300 leading-normal">
-                      {selectedIncidentRow.swarmData?.vulcanMaterial || 'Resource Dispatched: Asphalt Patching Rig Type-B'}
-                    </p>
-                  </div>
-
-                  {/* Mercury Agent */}
-                  <div className="border border-zinc-900/80 p-2.5 rounded bg-zinc-950/30 font-mono text-[9.5px] text-zinc-450 space-y-1">
-                    <div className="flex items-center justify-between border-b border-zinc-900/60 pb-1 text-zinc-400">
-                      <span className="font-bold flex items-center gap-1.5 font-mono text-white">
-                        <Send className="w-3.5 h-3.5 text-brand-cyan" />
-                        [Mercury-Agent]
-                      </span>
-                      <span className="text-brand-emerald text-[8px] font-bold">✓ PINGED</span>
-                    </div>
-                    <p className="text-zinc-300 leading-normal break-all">
-                      {selectedIncidentRow.swarmData?.mercuryPing || 'Outbound target API endpoint success (200 OK)'}
-                    </p>
-                  </div>
-
-                  {/* Chronos Agent */}
-                  <div className="border border-zinc-900/80 p-2.5 rounded bg-zinc-950/30 font-mono text-[9.5px] text-zinc-450 space-y-1">
-                    <div className="flex items-center justify-between border-b border-zinc-900/60 pb-1 text-zinc-400">
-                      <span className="font-bold flex items-center gap-1.5 text-white">
-                        <Hourglass className="w-3.5 h-3.5 text-brand-cyan" />
-                        [Chronos-Agent]
-                      </span>
-                      <span className="text-brand-emerald text-[8px] font-bold">✓ TRACKED</span>
-                    </div>
-                    <p className="text-zinc-300 leading-normal">
-                      {selectedIncidentRow.swarmData?.chronosEta || 'ETA locked: 14.2 Hours (Predictive degradation verified)'}
-                    </p>
-                  </div>
-
+                  )}
                 </div>
+
+                {/* 2. Atlas-Agent */}
+                <div className={`p-2.5 rounded border transition-all duration-300 ${
+                  swarmStep >= 2 ? 'border-brand-cyan/20 bg-brand-cyan/[0.01]' : 'border-zinc-900/50 opacity-45'
+                }`}>
+                  <div className="flex items-center justify-between text-[9px] font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" style={{ color: swarmStep >= 2 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
+                      [Atlas-Agent: Route Optimization]
+                    </span>
+                    <span className={swarmStep >= 2 ? 'text-brand-emerald animate-pulse' : 'text-zinc-650'}>
+                      {swarmStep >= 2 ? 'ROUTED // SUCCESS' : 'STANDBY'}
+                    </span>
+                  </div>
+                  {swarmStep >= 2 && (
+                    <p className="text-[9.5px] font-mono mt-1 text-zinc-350 leading-relaxed">
+                      Coordinates X:{selectedIncident.coordinates[0]}% Y:{selectedIncident.coordinates[1]}% linked to Municipal Ward 3. Gemini spatial vector mapped.
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Helios-Agent */}
+                <div className={`p-2.5 rounded border transition-all duration-300 ${
+                  swarmStep >= 3 ? 'border-brand-cyan/20 bg-brand-cyan/[0.01]' : 'border-zinc-900/50 opacity-45'
+                }`}>
+                  <div className="flex items-center justify-between text-[9px] font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex items-center gap-1.5">
+                      <Wrench className="w-3.5 h-3.5" style={{ color: swarmStep >= 3 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
+                      [Helios-Agent: Cost/Material Matrix via Gemini Engine]
+                    </span>
+                    <span className={swarmStep >= 3 ? 'text-brand-emerald animate-pulse' : 'text-zinc-650'}>
+                      {swarmStep >= 3 ? 'CALCULATED // SUCCESS' : 'STANDBY'}
+                    </span>
+                  </div>
+                  {swarmStep >= 3 && (
+                    <p className="text-[9.5px] font-mono mt-1 text-zinc-350 leading-relaxed">
+                      Estimated material cost: $550. Rig deployment type: Crew-B. Outbound hardware estimates committed.
+                    </p>
+                  )}
+                </div>
+
+                {/* 4. Mercury-Agent */}
+                <div className={`p-2.5 rounded border transition-all duration-300 ${
+                  swarmStep >= 4 ? 'border-brand-cyan/20 bg-brand-cyan/[0.01]' : 'border-zinc-900/50 opacity-45'
+                }`}>
+                  <div className="flex items-center justify-between text-[9px] font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex items-center gap-1.5">
+                      <Send className="w-3.5 h-3.5" style={{ color: swarmStep >= 4 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
+                      [Mercury-Agent: Outbound Fleet Dispatch]
+                    </span>
+                    <span className={swarmStep >= 4 ? 'text-brand-emerald animate-pulse' : 'text-zinc-650'}>
+                      {swarmStep >= 4 ? 'DISPATCHED // SUCCESS' : 'STANDBY'}
+                    </span>
+                  </div>
+                  {swarmStep >= 4 && (
+                    <p className="text-[9.5px] font-mono mt-1 text-zinc-350 leading-relaxed">
+                      Twilio SMS outbound dispatcher handshake accepted. Municipal API endpoint (Vite-Bridge) synced 200 OK.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons inside Center Swarm Drawer */}
+              <div className="space-y-2 pt-3 border-t" style={{ borderColor: 'var(--border-secondary)' }}>
+                <div className="flex items-center justify-between text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  <span>Consensus verifications count:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{(selectedIncident.verifications || []).length} / 3 confirmations</strong>
+                </div>
+
+                {selectedIncident.status === 'Triage' ? (
+                  <button
+                    onClick={() => onAuthorizeDispatch(selectedIncident.id)}
+                    className="w-full py-2 bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-bold font-mono text-[10px] tracking-wider uppercase rounded cursor-pointer transition-colors shadow-md"
+                  >
+                    Post Civic Bounty to Marketplace
+                  </button>
+                ) : (
+                  <div className="w-full py-1.5 bg-zinc-900 border text-center text-zinc-450 font-mono text-[9px] rounded" style={{ borderColor: 'var(--border-secondary)' }}>
+                    BOUNTY COMMITTED TO VOLUNTEER WORKSPACE
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
+              <Laptop className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
+              <div>
+                <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Command Overlay Idle</h4>
+                <p className="text-[10px] mt-1 max-w-[240px]" style={{ color: 'var(--text-muted)' }}>
+                  Select an active triage incident from the left panel to execute sequential swarm pipelines.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT PANEL: GOOGLE CLOUD STACK & ANALYTICS (3 Columns) */}
+        <div 
+          className="lg:col-span-3 border rounded-xl p-4 space-y-4 shadow-xl min-h-[500px]"
+          style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}
+        >
+          <div className="border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
+            <h3 className="text-xs font-bold font-mono tracking-wider uppercase text-white flex items-center gap-1.5">
+              <Activity className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
+              Cloud Infrastructure
+            </h3>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Live Google Cloud stack analytics & Gemini orchestration token loads.
+            </p>
+          </div>
+
+          {/* Simple Animated Visual Charts */}
+          <div className="space-y-4">
+            
+            {/* Spark chart 1 */}
+            <div className="space-y-1 bg-zinc-950/40 p-2.5 border rounded" style={{ borderColor: 'var(--border-secondary)' }}>
+              <div className="flex justify-between items-baseline text-[9.5px] font-mono">
+                <span style={{ color: 'var(--text-muted)' }}>Incident Queue Velocity</span>
+                <span style={{ color: 'var(--accent-cyan)' }}>+{activeCount} incidents/hr</span>
+              </div>
+              {/* Custom SVG line chart */}
+              <div className="w-full h-10 mt-1">
+                <svg viewBox="0 0 100 20" className="w-full h-full text-brand-cyan opacity-80">
+                  <path d="M 0 18 C 15 15, 30 18, 45 10 C 60 5, 80 12, 100 2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M 0 18 C 15 15, 30 18, 45 10 C 60 5, 80 12, 100 2 L 100 20 L 0 20 Z" fill="rgba(0, 255, 204, 0.05)" />
+                </svg>
               </div>
             </div>
 
-            {/* Action Footer */}
-            <div className="pt-4 border-t border-zinc-900 mt-6">
-              {selectedIncidentRow.status === 'Triage' ? (
-                <button
-                  onClick={() => {
-                    onAuthorizeDispatch(selectedIncidentRow.id);
-                    setSelectedIncidentRow(prev => prev ? { ...prev, status: 'Bounty_Posted' } : null);
-                  }}
-                  className="w-full py-2.5 bg-brand-cyan hover:bg-cyan-400 text-zinc-950 font-bold rounded text-[11px] font-mono tracking-wider uppercase transition-all shadow-[0_0_12px_rgba(0,229,255,0.15)] flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Coins className="w-3.5 h-3.5" />
-                  Post Civic Bounty
-                </button>
-              ) : selectedIncidentRow.status === 'Bounty_Posted' ? (
-                <div className="w-full py-2.5 bg-purple-950/20 border border-purple-900/30 text-purple-400 font-mono text-[10px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                  <Coins className="w-3.5 h-3.5" />
-                  Bounty Posted & Marketplace Open
-                </div>
-              ) : selectedIncidentRow.status === 'Claimed_In_Progress' ? (
-                <div className="w-full py-2.5 bg-brand-amber/10 border border-brand-amber/20 text-brand-amber font-mono text-[10px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 animate-spin" />
-                  Claimed by {selectedIncidentRow.claimedBy || 'Volunteer'}
-                </div>
-              ) : selectedIncidentRow.status === 'Peer_Review' ? (
-                <div className="w-full py-2.5 bg-blue-950/20 border border-blue-900/30 text-blue-400 font-mono text-[10px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-                  Awaiting Peer Review Verification
-                </div>
-              ) : selectedIncidentRow.status === 'Resolved' ? (
-                <div className="w-full py-2.5 bg-brand-emerald/10 border border-brand-emerald/20 text-brand-emerald font-mono text-[10px] rounded text-center uppercase flex items-center justify-center gap-1.5 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Response Resolved
-                </div>
-              ) : (
-                <div className="w-full py-2.5 bg-zinc-900/40 border border-zinc-800 text-zinc-550 font-mono text-[10px] rounded text-center uppercase flex items-center justify-center gap-1.5">
-                  <X className="w-3.5 h-3.5" />
-                  Ticket Archived
-                </div>
-              )}
+            {/* Spark chart 2 */}
+            <div className="space-y-1 bg-zinc-950/40 p-2.5 border rounded" style={{ borderColor: 'var(--border-secondary)' }}>
+              <div className="flex justify-between items-baseline text-[9.5px] font-mono">
+                <span style={{ color: 'var(--text-muted)' }}>Spam Isolation Rate</span>
+                <span style={{ color: 'var(--accent-amber)' }}>94.2% quarantine</span>
+              </div>
+              <div className="w-full h-10 mt-1">
+                <svg viewBox="0 0 100 20" className="w-full h-full text-brand-amber opacity-85">
+                  <path d="M 0 12 C 20 8, 40 14, 60 5 C 80 2, 90 8, 100 6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M 0 12 C 20 8, 40 14, 60 5 C 80 2, 90 8, 100 6 L 100 20 L 0 20 Z" fill="rgba(255, 204, 0, 0.05)" />
+                </svg>
+              </div>
             </div>
           </div>
-        </>
-      )}
 
-      {/* Floating Live Triage Toast Alert */}
-      {newIncidentToast && (
-        <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-zinc-950 border border-brand-cyan/40 rounded-lg p-4 shadow-[0_0_30px_rgba(0,229,255,0.25)] animate-slide-up flex flex-col gap-2 select-none">
-          <div className="flex items-center justify-between border-b border-zinc-900 pb-1.5">
-            <span className="text-[9.5px] font-mono font-bold text-brand-cyan flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-ping" />
-              [AI TRIAGE ALERT]
+          {/* Dedicated Styled Google Cloud Telemetry Bento Panel */}
+          <div className="space-y-2">
+            <span className="text-[8px] font-mono uppercase tracking-wider block font-bold" style={{ color: 'var(--text-muted)' }}>
+              Google Cloud Telemetry
             </span>
-            <button 
-              onClick={() => setNewIncidentToast(null)} 
-              className="text-zinc-550 hover:text-zinc-350 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            <div className="border rounded p-3 space-y-2.5 font-mono text-[9px]" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}>
+              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: 'var(--border-secondary)' }}>
+                <span>Cloud Run Instance:</span>
+                <span className="flex items-center gap-1 font-bold text-[8px]" style={{ color: 'var(--accent-cyan)' }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+                  ACTIVE
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: 'var(--border-secondary)' }}>
+                <span>Container Build:</span>
+                <span className="font-bold text-[8px]" style={{ color: 'var(--accent-cyan)' }}>
+                  SUCCESS
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span>Gemini API Load:</span>
+                <strong style={{ color: 'var(--accent-amber)' }}>34.2k tokens/m</strong>
+              </div>
+            </div>
           </div>
-          <div className="font-mono text-[9px] text-zinc-300 leading-normal">
-            New incoming node detected in Sector-3. Verifying spatial integrity...
+        </div>
+
+      </div>
+
+      {/* 3. DEVELOPER LOG CORE PANEL Drawer Terminal "/DEV" (Invisible to Citizens/Contractors) */}
+      <div 
+        className="border rounded-xl shadow-2xl relative overflow-hidden transition-all duration-300 flex flex-col"
+        style={{ 
+          borderColor: 'var(--border-secondary)', 
+          backgroundColor: 'var(--bg-card)',
+          height: devConsoleOpen ? '260px' : '44px'
+        }}
+      >
+        {/* Toggle Header */}
+        <div 
+          onClick={() => setDevConsoleOpen(!devConsoleOpen)}
+          className="px-4 h-11 flex items-center justify-between cursor-pointer border-b select-none"
+          style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}
+        >
+          <div className="flex items-center gap-2 font-mono text-[10px] font-bold text-white">
+            <Terminal className="w-4 h-4 text-brand-cyan" />
+            <span>OPERATIONAL TELEMETRY DRAWER // /DEV</span>
           </div>
-          <div className="bg-zinc-900/40 p-2 border border-zinc-900/60 rounded flex flex-col gap-0.5">
-            <span className="font-bold text-white text-[10.5px]">{newIncidentToast.category}</span>
-            <span className="text-zinc-400 text-[9.5px] font-medium">{newIncidentToast.location}</span>
-            <span className="text-brand-cyan font-mono text-[8px] mt-1">
-              {newIncidentToast.geolocation 
-                ? `GPS: ${newIncidentToast.geolocation.lat.toFixed(6)}°, ${newIncidentToast.geolocation.lng.toFixed(6)}°` 
-                : `GPS: ${(40.7128 + newIncidentToast.coordinates[0] * 0.001).toFixed(6)}°, ${(-74.0060 - newIncidentToast.coordinates[1] * 0.001).toFixed(6)}°`
-              }
+          <div className="flex items-center gap-3">
+            <span className="text-[8px] font-mono text-zinc-500 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-900 uppercase">
+              {devLogs.length} updates logged
+            </span>
+            <span className="text-zinc-400 font-bold font-mono text-xs">
+              {devConsoleOpen ? '▼ Minimize' : '▲ Expand /DEV Console'}
             </span>
           </div>
         </div>
+
+        {/* Console logs body */}
+        <div className="flex-1 p-4 font-mono text-[9px] space-y-2 overflow-y-auto bg-black select-text text-zinc-300">
+          {devLogs.map((log, idx) => (
+            <div key={idx} className="space-y-0.5 border-b pb-1 border-zinc-950">
+              <div className="flex items-start justify-between">
+                <span className="text-zinc-550 font-semibold shrink-0">[{log.time}]</span>
+                <span className="text-brand-cyan font-bold flex-1 ml-2">{log.msg}</span>
+              </div>
+              {log.raw && (
+                <pre className="text-zinc-500 text-[8.5px] pl-16 bg-[#040606] p-1 rounded border border-zinc-950 whitespace-pre-wrap select-all">
+                  {log.raw}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. SYNC DEVICE OVERLAY MODAL */}
+      {showSyncModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div 
+            className="w-full max-w-sm border rounded-xl p-5 space-y-4 shadow-2xl relative"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          >
+            <button 
+              onClick={() => setShowSyncModal(false)}
+              className="absolute top-3 right-3 p-1 rounded hover:bg-zinc-850 cursor-pointer text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center space-y-1 border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
+              <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-white">
+                Sync Device Pairing Bridge
+              </h3>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                Establish high-security bridge link to mobile hardware sensors.
+              </p>
+            </div>
+
+            {/* QR Scan box */}
+            <div className="flex items-center justify-center p-6 border rounded-lg bg-black/60 relative overflow-hidden h-44" style={{ borderColor: 'var(--border-secondary)' }}>
+              {syncStatus === 'idle' && (
+                <div className="text-center space-y-3">
+                  <QrCode className="w-16 h-16 mx-auto text-zinc-650" />
+                  <button 
+                    onClick={() => {
+                      setSyncStatus('scanning');
+                      setTimeout(() => {
+                        setSyncStatus('success');
+                        const now = new Date().toLocaleTimeString();
+                        setDevLogs(prev => [
+                          { time: now, msg: `[DEVICES] Bridge paired successfully. Handshake sync keys committed.` },
+                          ...prev
+                        ]);
+                      }, 2500);
+                    }}
+                    className="px-4 py-1.5 rounded font-bold font-mono text-[9px] uppercase cursor-pointer"
+                    style={{ backgroundColor: 'var(--accent-cyan)', color: 'var(--bg-primary)' }}
+                  >
+                    Initialize Laser Scan
+                  </button>
+                </div>
+              )}
+
+              {syncStatus === 'scanning' && (
+                <div className="relative w-28 h-28 border border-dashed flex flex-col items-center justify-center" style={{ borderColor: 'var(--accent-cyan)' }}>
+                  <QrCode className="w-20 h-20 text-brand-cyan opacity-40 animate-pulse" />
+                  {/* Moving red scanline */}
+                  <div className="absolute left-0 right-0 h-0.5 bg-red-500 animate-bounce" style={{ top: '45%' }} />
+                  <span className="text-[8px] font-mono mt-2 text-brand-cyan animate-pulse">SCANNING HANDSHAKE...</span>
+                </div>
+              )}
+
+              {syncStatus === 'success' && (
+                <div className="text-center space-y-2">
+                  <CheckCircle2 className="w-12 h-12 mx-auto text-brand-emerald animate-bounce" />
+                  <span className="text-[9px] font-mono text-brand-emerald block font-bold">BRIDGE CONNECTION SECURED</span>
+                  <button 
+                    onClick={() => setShowSyncModal(false)}
+                    className="px-3 py-1 rounded bg-zinc-900 border border-zinc-800 text-[8.5px] font-mono text-zinc-300 hover:text-white"
+                  >
+                    Close Modal
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
+
     </div>
   );
 };

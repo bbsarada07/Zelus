@@ -231,7 +231,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
     if (newRole === 'Admin') {
       setUsername('admin_zero');
     } else if (newRole === 'Contractor') {
-      setUsername('volunteer_alpha');
+      setUsername('contractor_alpha');
     } else {
       setUsername('citizen_hero');
     }
@@ -388,7 +388,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
             }}
           >
             <Shield className="w-3.5 h-3.5" />
-            Admin
+            Admin Center
           </button>
           <button
             type="button"
@@ -404,7 +404,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
             }}
           >
             <User className="w-3.5 h-3.5" />
-            Citizen
+            Citizen App
           </button>
           <button
             type="button"
@@ -420,7 +420,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
             }}
           >
             <Wrench className="w-3.5 h-3.5" />
-            Contractor
+            Contractor Workspace
           </button>
         </div>
 
