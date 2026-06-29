@@ -306,6 +306,19 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                       {bounty.description}
                     </p>
 
+                    {bounty.materials && bounty.materials.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Authorized Materials (BOM):</span>
+                        <div className="flex flex-wrap gap-1">
+                          {bounty.materials.map((mat, i) => (
+                            <span key={i} className="text-[7.5px] border border-zinc-800 bg-zinc-950 px-1 py-0.2 rounded font-mono text-zinc-300">
+                              {mat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Deadline and Tokens Row */}
                     <div className="flex items-center justify-between text-[9px] font-mono pt-1">
                       <div className="flex items-center gap-1">
@@ -400,6 +413,24 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                         <ClaimCountdown targetTime={incident.etaTargetTime} />
                       )}
                     </div>
+
+                    {incident.materials && incident.materials.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>Allocated Materials (BOM):</span>
+                        <div className="flex flex-wrap gap-1">
+                          {incident.materials.map((mat, i) => (
+                            <span key={i} className="text-[7.5px] border border-zinc-800 bg-zinc-950 px-1 py-0.2 rounded font-mono text-zinc-300">
+                              {mat}
+                            </span>
+                          ))}
+                        </div>
+                        {incident.costBreakdown && (
+                          <span className="text-[8px] font-mono block text-zinc-400">
+                            Budget Committed: Materials ${incident.costBreakdown.materials} | Labor ${incident.costBreakdown.labor} | Total: <strong className="text-brand-cyan">${incident.costBreakdown.total}</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Stepper Status Indicators */}
                     <div className="grid grid-cols-5 gap-1 items-center justify-between text-[9px] font-mono bg-black/35 p-2 rounded border" style={{ borderColor: 'var(--border-secondary)' }}>

@@ -42,7 +42,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
   // Form State
   const [reportCategory, setReportCategory] = useState('Road & Structural Damage');
-  const [reportLocation, setReportLocation] = useState('Sector 4 Area');
+  const [reportLocation, setReportLocation] = useState('5th Ave & 23rd St');
   const [reportX, setReportX] = useState(48.2);
   const [reportY, setReportY] = useState(61.9);
   const [reportNotes, setReportNotes] = useState('');
@@ -65,8 +65,15 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
   const voiceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const voiceAnimationRef = useRef<number | null>(null);
 
-  // AI Pipeline Toggles: 'off' | 'enhance' | 'translate'
-  const [aiPipelineMode, setAiPipelineMode] = useState<'off' | 'enhance' | 'translate'>('off');
+  // Camera simulation state
+  const [cameraEngaged, setCameraEngaged] = useState<boolean>(false);
+  const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraAnimationRef = useRef<number | null>(null);
+
+  // AI Pipeline Toggles: stage 1 (Enhance) & stage 2 (Translate)
+  const [aiEnhanceActive, setAiEnhanceActive] = useState<boolean>(true);
+  const [aiTranslateActive, setAiTranslateActive] = useState<boolean>(false);
+  const [selectedDialect, setSelectedDialect] = useState<string>('Telugu');
 
   // Submit UI states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,7 +95,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
   };
 
   const startCamera = () => {
-    // Stub for Tab navigation triggers
+    // Handled in simulation
   };
 
   // Transaction Ledger log history
@@ -103,21 +110,21 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
           const lng = pos.coords.longitude;
           setGeoCoords({ lat, lng });
           
-          // Map to simulated X, Y (0-100)
+          // Map to simulated coordinates
           const simulatedX = parseFloat((35 + Math.abs((lng * 100) % 40)).toFixed(1));
           const simulatedY = parseFloat((35 + Math.abs((lat * 100) % 40)).toFixed(1));
           setReportX(simulatedX);
           setReportY(simulatedY);
-          setReportLocation(`Grid Node: [Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}]`);
+          setReportLocation(`${lat.toFixed(4)} N, ${lng.toFixed(4)} E`);
         },
         (err) => {
           console.warn("Geolocation access denied. Setting default grid coordinates.", err);
-          setGeoCoords({ lat: 40.7128, lng: -74.0060 });
+          setGeoCoords({ lat: 17.4501, lng: 78.5252 });
           setGeoError("Perms blocked - default seed coordinates injected");
         }
       );
     } else {
-      setGeoCoords({ lat: 40.7128, lng: -74.0060 });
+      setGeoCoords({ lat: 17.4501, lng: 78.5252 });
       setGeoError("Browser does not support geolocation");
     }
   }, []);
@@ -155,6 +162,107 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
     });
   };
 
+  // Simulated Camera Drawing Animation
+  useEffect(() => {
+    if (!cameraEngaged) {
+      if (cameraAnimationRef.current) {
+        cancelAnimationFrame(cameraAnimationRef.current);
+      }
+      return;
+    }
+
+    const canvas = cameraCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let scanLineY = 0;
+    let scanDirection = 1;
+
+    const drawSimulatedCamera = () => {
+      if (!canvas || !ctx) return;
+      
+      // Draw background noise/colors
+      ctx.fillStyle = isDark ? '#091214' : '#F0F4F4';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw horizontal static lines
+      ctx.strokeStyle = isDark ? 'rgba(0, 255, 204, 0.05)' : 'rgba(10, 70, 228, 0.05)';
+      ctx.lineWidth = 1;
+      for (let y = 0; y < canvas.height; y += 12) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Draw scanning laser line
+      ctx.strokeStyle = isDark ? 'rgba(0, 255, 204, 0.6)' : 'rgba(10, 70, 228, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, scanLineY);
+      ctx.lineTo(canvas.width, scanLineY);
+      ctx.stroke();
+
+      // Pulsing crosshair
+      ctx.strokeStyle = isDark ? 'var(--accent-cyan)' : 'var(--border-primary)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      // Center circle
+      ctx.arc(canvas.width / 2, canvas.height / 2, 24 + Math.sin(Date.now() * 0.005) * 4, 0, Math.PI * 2);
+      // Cross hair hairs
+      ctx.moveTo(canvas.width / 2 - 35, canvas.height / 2);
+      ctx.lineTo(canvas.width / 2 - 10, canvas.height / 2);
+      ctx.moveTo(canvas.width / 2 + 10, canvas.height / 2);
+      ctx.lineTo(canvas.width / 2 + 35, canvas.height / 2);
+      ctx.moveTo(canvas.width / 2, canvas.height / 2 - 35);
+      ctx.lineTo(canvas.width / 2, canvas.height / 2 - 10);
+      ctx.moveTo(canvas.width / 2, canvas.height / 2 + 10);
+      ctx.lineTo(canvas.width / 2, canvas.height / 2 + 35);
+      ctx.stroke();
+
+      // Simulated HUD stats
+      ctx.fillStyle = isDark ? '#00FFCC' : '#0A46E4';
+      ctx.font = '7.5px monospace';
+      ctx.fillText('HDR HIGH-RES FOCUS', 12, 18);
+      ctx.fillText(`GPS SYNC: ${geoCoords?.lat.toFixed(4) || '17.4501'}, ${geoCoords?.lng.toFixed(4) || '78.5252'}`, 12, 28);
+      ctx.fillText('STABILIZER NOMINAL', canvas.width - 95, 18);
+      
+      // Update scanline
+      scanLineY += 2.5 * scanDirection;
+      if (scanLineY >= canvas.height || scanLineY <= 0) {
+        scanDirection *= -1;
+      }
+
+      cameraAnimationRef.current = requestAnimationFrame(drawSimulatedCamera);
+    };
+
+    drawSimulatedCamera();
+
+    return () => {
+      if (cameraAnimationRef.current) {
+        cancelAnimationFrame(cameraAnimationRef.current);
+      }
+    };
+  }, [cameraEngaged, isDark, geoCoords]);
+
+  // Capture action simulation
+  const capturePhotoAction = () => {
+    setIsVisionScanning(true);
+    setCameraEngaged(false);
+    setTimeout(() => {
+      setIsVisionScanning(false);
+      // Map mock photos
+      if (reportCategory === 'Road & Structural Damage') {
+        setReportImage('/road_pothole.png');
+      } else if (reportCategory === 'Water Outage & Flooding') {
+        setReportImage('/water_main_burst.png');
+      } else {
+        setReportImage('/downed_power_line.png');
+      }
+    }, 1200);
+  };
+
   // Vision Simulator Preset triggers
   const handleSelectVisionPreset = (presetIndex: number) => {
     setIsVisionScanning(true);
@@ -164,19 +272,16 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
       setIsVisionScanning(false);
       
       if (presetIndex === 0) {
-        // Pothole
         setReportCategory('Road & Structural Damage');
         setReportSeverity('Moderate');
         setReportImage('/road_pothole.png');
         setReportNotes('Severe road pothole and tarmac damage parsed on main thoroughfare corridor.');
       } else if (presetIndex === 1) {
-        // Water Leak
         setReportCategory('Water Outage & Flooding');
         setReportSeverity('Critical');
         setReportImage('/water_main_burst.png');
         setReportNotes('High pressure water pipeline rupture causing heavy localized street flooding.');
       } else {
-        // Streetlight
         setReportCategory('Utility & Spark Hazard');
         setReportSeverity('Low');
         setReportImage('/downed_power_line.png');
@@ -201,20 +306,20 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
         let step = 0;
         const drawWave = () => {
           if (!isRecording) return;
-          ctx.fillStyle = isDark ? '#050A0B' : '#FAF9F6';
+          ctx.fillStyle = isDark ? '#111A1C' : '#FFFFFF';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          ctx.strokeStyle = isDark ? '#00FFCC' : '#006650';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = isDark ? '#00FFCC' : '#0A46E4';
+          ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(0, canvas.height / 2);
           for (let i = 0; i < canvas.width; i++) {
-            const amp = Math.sin(i * 0.05 + step) * (10 + Math.random() * 15);
+            const amp = Math.sin(i * 0.08 + step) * (10 + Math.random() * 10);
             ctx.lineTo(i, canvas.height / 2 + amp);
           }
           ctx.stroke();
           
-          step += 0.2;
+          step += 0.25;
           voiceAnimationRef.current = requestAnimationFrame(drawWave);
         };
         drawWave();
@@ -234,19 +339,25 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
     setTimeout(() => {
       setTranscribing(false);
-      // Run AI enhance / translate logics
       let text = '';
       let badge: string | null = null;
 
-      if (aiPipelineMode === 'translate') {
-        text = 'High-severity road surface pothole fracture identified on main sector corridor, impeding vehicular traffic.';
-        badge = '[Translated from Hindi to English]';
-      } else if (aiPipelineMode === 'enhance') {
-        text = 'Observed severe road surface erosion and localized asphalt fracture on main roadway, causing driver deceleration.';
-        badge = null;
+      // Category-aware templates
+      if (reportCategory === 'Water Outage & Flooding') {
+        const rawText = "nillu ostaledu road motham paadaipoindi water burst aindi";
+        const enhancedText = "A high-pressure water pipeline rupture has occurred near the intersection, causing substantial street flooding and blocking pedestrian crosswalks.";
+        text = aiEnhanceActive ? enhancedText : rawText;
+        badge = aiTranslateActive ? `[Translated from ${selectedDialect} to English]` : null;
+      } else if (reportCategory === 'Road & Structural Damage') {
+        const rawText = "road kharab hogaya pura pothole pad gaya hai";
+        const enhancedText = "Severe asphalt erosion and road pothole fractures detected, leading to traffic slowing and hazardous driving conditions.";
+        text = aiEnhanceActive ? enhancedText : rawText;
+        badge = aiTranslateActive ? `[Translated from ${selectedDialect} to English]` : null;
       } else {
-        text = 'sadak par ek bada gaddha hai gaadi chalane me dikkat ho rahi hai.';
-        badge = null;
+        const rawText = "electricity wires nunchi nippulu ostunayi danger";
+        const enhancedText = "Damaged utility line short-circuit causing active electrical sparks near the station entrance, posing an immediate hazard.";
+        text = aiEnhanceActive ? enhancedText : rawText;
+        badge = aiTranslateActive ? `[Translated from ${selectedDialect} to English]` : null;
       }
 
       setReportNotes(text);
@@ -263,11 +374,28 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
     const generatedHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase()}`;
 
+    // Calculate dynamic BOM lists and costs based on category
+    let materialsList: string[] = ["General Safety Barrier", "Repair Toolkit Rental"];
+    let costObj = { materials: 100, labor: 150, total: 250 };
+
+    if (reportCategory === 'Water Outage & Flooding') {
+      materialsList = ["3-inch PVC High-Pressure Clamps", "Industrial De-watering Pump rental", "Crushed Gravel Bedding (2 Tons)"];
+      costObj = { materials: 450, labor: 350, total: 800 };
+    } else if (reportCategory === 'Road & Structural Damage') {
+      materialsList = ["Asphalt Patch Compound (5 Bags)", "Traffic Safety Cones (4 units)", "Compaction Rammer Rental"];
+      costObj = { materials: 150, labor: 200, total: 350 };
+    } else if (reportCategory === 'Utility & Spark Hazard') {
+      materialsList = ["High-Voltage Insulation Tape", "Ceramic Insulator Bushings (2 units)", "Grid Diagnostics Meter Rental"];
+      costObj = { materials: 600, labor: 400, total: 1000 };
+    }
+
     const logs = [
       '⚡ [ZELUS-ORCHESTRATOR] INITIATING COMPLAINT RECORD...',
       '🔍 [AEGIS-AGENT] Checking duplicate node signatures...',
       '🟢 [AEGIS-AGENT] Exif matched, zero fraud flags identified.',
-      `📍 [ATLAS-AGENT] Mapping geospatial vectors: Lat: ${geoCoords?.lat.toFixed(5) || '40.7128'} Lng: ${geoCoords?.lng.toFixed(5) || '-74.0060'}`,
+      `📍 [ATLAS-AGENT] Mapping geospatial vectors: Lat: ${geoCoords?.lat.toFixed(5) || '17.4501'} Lng: ${geoCoords?.lng.toFixed(5) || '78.5252'}`,
+      '📦 [HELIOS-AGENT] Projecting Material list & Bills of Materials (BOM)...',
+      `💰 [HELIOS-AGENT] Allocated cost target: Materials $${costObj.materials} Labor $${costObj.labor} Total $${costObj.total}`,
       '📦 [PERSISTENCE] Syncing node telemetry to global ledger storage...',
       `🔐 [BLOCKCHAIN] committed secure hash: ${generatedHash.slice(0, 16)}...`,
       '🏁 [SUCCESS] Incident successfully registered. Outbound alarms triggered!'
@@ -294,9 +422,11 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
             description: reportNotes || 'Civic infrastructure report submitted via mobile portal.',
             languageBadge: languageBadge,
             image: reportImage || '/road_pothole.png',
-            geolocation: geoCoords || { lat: 40.7128, lng: -74.0060 },
+            geolocation: geoCoords || { lat: 17.4501, lng: 78.5252 },
             exifVerified: true,
-            hash: generatedHash
+            hash: generatedHash,
+            materials: materialsList,
+            costBreakdown: costObj
           });
 
           onUpdateKarma(100);
@@ -383,9 +513,9 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
         {/* TAB 1: CIVIC MARKETPLACE */}
         {activeTab === 'marketplace' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-slide-down">
             <div>
-              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2 animate-pulse" style={{ color: 'var(--text-primary)' }}>
                 <Coins className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
                 Civic Marketplace
               </h3>
@@ -399,16 +529,22 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                 [NO ACTIVE CLAIMS IN SECTOR LEDGER]
               </div>
             ) : (
-              <div className="space-y-3.5">
+              <div className="space-y-3">
                 {activeClaims.map(inc => {
                   const verifiedCount = inc.verifications?.length || 0;
                   const isPeer = inc.status === 'Peer_Review';
+                  
+                  // Calculate dynamic matched sponsor pool
+                  const matchTarget = inc.costBreakdown?.total || 500;
+                  const upvoteFunding = inc.upvotes * 15;
+                  const matchAmount = Math.min(matchTarget, Math.floor(matchTarget * 0.4 + upvoteFunding));
+                  const matchPercent = Math.min(100, Math.floor((matchAmount / matchTarget) * 100));
 
                   return (
                     <div 
                       key={inc.id}
                       onClick={() => setSelectedBounty(inc)}
-                      className="border rounded-lg p-3.5 space-y-3.5 cursor-pointer transition-all hover:scale-[1.01]"
+                      className="border rounded-lg p-3.5 space-y-3 cursor-pointer transition-all hover:scale-[1.01] hover:border-brand-cyan/40 bg-zinc-950/20"
                       style={{ 
                         backgroundColor: 'var(--bg-card)', 
                         borderColor: selectedBounty?.id === inc.id ? 'var(--accent-cyan)' : 'var(--border-secondary)'
@@ -421,21 +557,21 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                               {inc.id}
                             </span>
                             {inc.languageBadge && (
-                              <span className="text-[7.5px] bg-cyan-950/20 text-brand-cyan border border-brand-cyan/20 px-1 rounded font-mono">
+                              <span className="text-[7.5px] border px-1 rounded font-mono" style={{ borderColor: 'var(--border-primary)', color: 'var(--accent-cyan)' }}>
                                 {inc.languageBadge}
                               </span>
                             )}
                           </div>
-                          <h4 className="text-xs font-bold mt-1.5" style={{ color: 'var(--text-primary)' }}>
+                          <h4 className="text-xs font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
                             {inc.category}
                           </h4>
-                          <span className="text-[9px] flex items-center gap-0.5 mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                            <MapPin className="w-3 h-3 text-zinc-550 shrink-0" />
+                          <span className="text-[9px] flex items-center gap-0.5 mt-0.5 truncate font-mono" style={{ color: 'var(--text-muted)' }}>
+                            <MapPin className="w-3 h-3 shrink-0" style={{ color: 'var(--accent-cyan)' }} />
                             {inc.location}
                           </span>
                         </div>
                         <span className="px-1.5 py-0.5 rounded text-[8px] font-mono border font-semibold" style={{
-                          backgroundColor: inc.severity === 'Critical' ? 'rgba(255, 59, 48, 0.15)' : 'rgba(255, 204, 0, 0.15)',
+                          backgroundColor: inc.severity === 'Critical' ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 204, 0, 0.1)',
                           borderColor: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)',
                           color: inc.severity === 'Critical' ? 'var(--accent-red)' : 'var(--accent-amber)'
                         }}>
@@ -444,13 +580,13 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                       </div>
 
                       {/* Matching pool progress bar */}
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <div className="flex justify-between items-end text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                          <span>Sponsor Matching Pool</span>
-                          <span style={{ color: 'var(--text-primary)' }}>$550 / $800</span>
+                          <span>Matching Sponsorships</span>
+                          <span style={{ color: 'var(--text-primary)' }}>${matchAmount} / ${matchTarget} ({matchPercent}%)</span>
                         </div>
-                        <div className="w-full h-1 bg-zinc-950 rounded-full overflow-hidden border border-zinc-900">
-                          <div className="h-full bg-brand-emerald rounded-full transition-all duration-300" style={{ width: '68%', backgroundColor: 'var(--accent-cyan)' }} />
+                        <div className="w-full h-1 rounded-full overflow-hidden border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${matchPercent}%`, backgroundColor: 'var(--accent-cyan)' }} />
                         </div>
                       </div>
 
@@ -459,8 +595,13 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                         <span style={{ color: 'var(--text-muted)' }}>
                           Votes: <strong style={{ color: 'var(--text-primary)' }}>{inc.upvotes} Consensus</strong>
                         </span>
-                        <span style={{ color: isPeer ? 'var(--accent-amber)' : 'var(--text-muted)' }}>
-                          {isPeer ? `Awaiting review (${verifiedCount}/3)` : inc.status.replace(/_/g, ' ')}
+                        <span className="uppercase tracking-widest font-extrabold text-[8px] border px-1.5 py-0.5 rounded" 
+                              style={{ 
+                                borderColor: isPeer ? 'var(--accent-amber)' : 'var(--border-secondary)',
+                                color: isPeer ? 'var(--accent-amber)' : 'var(--accent-cyan)',
+                                backgroundColor: 'var(--bg-secondary)'
+                              }}>
+                          {isPeer ? `VERIFYING (${verifiedCount}/3)` : inc.status.replace(/_/g, ' ')}
                         </span>
                       </div>
                     </div>
@@ -473,9 +614,9 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
         {/* TAB 2: REPORT ENGINE */}
         {activeTab === 'report' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-slide-down">
             <div>
-              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2 animate-pulse" style={{ color: 'var(--text-primary)' }}>
                 <Camera className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
                 Hyperlocal Report Engine
               </h3>
@@ -486,14 +627,14 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
             {/* Presets simulating vision input */}
             <div className="space-y-1.5 p-2.5 rounded border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
-              <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[8px] font-mono uppercase tracking-wider block font-bold" style={{ color: 'var(--text-muted)' }}>
                 GEMINI VISION SIMULATION PRESETS:
               </span>
               <div className="grid grid-cols-3 gap-1">
                 <button 
                   type="button" 
                   onClick={() => handleSelectVisionPreset(0)}
-                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center font-bold"
                   style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
                 >
                   [ pothole.png ]
@@ -501,7 +642,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                 <button 
                   type="button" 
                   onClick={() => handleSelectVisionPreset(1)}
-                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center font-bold"
                   style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
                 >
                   [ leak_burst.png ]
@@ -509,7 +650,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                 <button 
                   type="button" 
                   onClick={() => handleSelectVisionPreset(2)}
-                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center"
+                  className="px-1.5 py-1 text-[8px] font-mono border rounded hover:bg-zinc-800/10 cursor-pointer truncate text-center font-bold"
                   style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
                 >
                   [ streetlight.png ]
@@ -518,8 +659,8 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
             </div>
 
             <form onSubmit={handleReportSubmit} className="space-y-4">
-              {/* Photo Uplink Frame with scanning animations */}
-              <div className="border rounded-lg relative overflow-hidden flex flex-col justify-end min-h-[150px] bg-zinc-950" style={{ borderColor: 'var(--border-secondary)' }}>
+              {/* Photo Uplink Frame with canvas camera simulation */}
+              <div className="border rounded-lg relative overflow-hidden flex flex-col justify-center items-center min-h-[160px] bg-zinc-950" style={{ borderColor: 'var(--border-secondary)' }}>
                 {isVisionScanning && (
                   <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center space-y-2 z-30">
                     <Sparkles className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-cyan)' }} />
@@ -529,10 +670,39 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                   </div>
                 )}
 
+                {cameraEngaged ? (
+                  <div className="absolute inset-0 z-20 flex flex-col justify-between">
+                    <canvas ref={cameraCanvasRef} width={300} height={160} className="absolute inset-0 w-full h-full object-cover" />
+                    
+                    {/* Blinking engaged tag */}
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/75 px-2 py-0.5 rounded border border-emerald-500/30 text-[7.5px] font-mono text-emerald-400 font-extrabold animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      FEED ENGAGED
+                    </div>
+
+                    <div className="absolute bottom-2 inset-x-2 flex gap-1.5 z-30">
+                      <button
+                        type="button"
+                        onClick={capturePhotoAction}
+                        className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-[9px] rounded shadow-md cursor-pointer border border-emerald-400/20"
+                      >
+                        [ Capture Photo ]
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCameraEngaged(false)}
+                        className="py-1 px-3 bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[9px] rounded hover:text-white cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 {reportImage ? (
                   <>
                     <img src={reportImage} alt="Visual preset" className="absolute inset-0 w-full h-full object-cover" />
-                    <div className="relative z-10 p-2 border-t flex justify-between items-center text-[8.5px] font-mono" style={{ backgroundColor: 'rgba(9, 15, 16, 0.95)', borderColor: 'var(--border-secondary)' }}>
+                    <div className="relative z-10 p-2 border-t w-full flex justify-between items-center text-[8.5px] font-mono mt-auto" style={{ backgroundColor: 'rgba(9, 15, 16, 0.95)', borderColor: 'var(--border-secondary)' }}>
                       <span style={{ color: 'var(--accent-cyan)' }}>IMAGE CAPTURE VERIFIED</span>
                       <button 
                         type="button" 
@@ -545,10 +715,20 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-8 space-y-2">
-                    <Camera className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
-                    <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>No visual feed loaded</span>
-                  </div>
+                  !cameraEngaged && (
+                    <div className="flex flex-col items-center justify-center p-8 space-y-3">
+                      <Camera className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+                      <button
+                        type="button"
+                        onClick={() => setCameraEngaged(true)}
+                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white border text-[9px] font-mono font-bold rounded cursor-pointer transition-all"
+                        style={{ borderColor: 'var(--border-secondary)' }}
+                      >
+                        Connect Hardware Camera
+                      </button>
+                      <span className="text-[7.5px] font-mono" style={{ color: 'var(--text-muted)' }}>Click above or choose preset simulation</span>
+                    </div>
+                  )
                 )}
               </div>
 
@@ -556,17 +736,17 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
               <div className="space-y-3">
                 {/* Geolocation target chips */}
                 <div className="space-y-1">
-                  <label className="block text-[8px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <label className="block text-[8px] font-mono uppercase tracking-wider font-bold" style={{ color: 'var(--text-muted)' }}>
                     Automated GPS Geolocation Engine
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="border rounded px-2.5 py-1.5 flex items-center justify-between text-[9.5px] font-mono" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
                       <span style={{ color: 'var(--text-muted)' }}>LATITUDE:</span>
-                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lat.toFixed(5) || 'Searching...'}</strong>
+                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lat.toFixed(6) || 'Searching...'}</strong>
                     </div>
                     <div className="border rounded px-2.5 py-1.5 flex items-center justify-between text-[9.5px] font-mono" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
                       <span style={{ color: 'var(--text-muted)' }}>LONGITUDE:</span>
-                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lng.toFixed(5) || 'Searching...'}</strong>
+                      <strong style={{ color: 'var(--accent-cyan)' }}>{geoCoords?.lng.toFixed(6) || 'Searching...'}</strong>
                     </div>
                   </div>
                   {geoError && (
@@ -575,89 +755,108 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[8px] font-mono uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Category Dropdown</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-[8px] font-mono uppercase tracking-wider mb-1 font-bold" style={{ color: 'var(--text-muted)' }}>Category</label>
+                  <select
                     value={reportCategory}
-                    disabled
-                    className="w-full border rounded px-2.5 py-1.5 text-[10px] font-mono select-none"
+                    onChange={(e) => {
+                      setReportCategory(e.target.value);
+                      if (e.target.value === 'Water Outage & Flooding') setReportSeverity('Critical');
+                      else if (e.target.value === 'Road & Structural Damage') setReportSeverity('Moderate');
+                      else setReportSeverity('Low');
+                    }}
+                    className="w-full border rounded px-2.5 py-1.5 text-[10px] font-mono"
                     style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
-                  />
+                  >
+                    <option value="Road & Structural Damage">Road & Structural Damage</option>
+                    <option value="Water Outage & Flooding">Water Outage & Flooding</option>
+                    <option value="Utility & Spark Hazard">Utility & Spark Hazard</option>
+                  </select>
                 </div>
 
                 {/* Multilingual Acoustic AI Pipeline */}
                 <div className="space-y-2 border rounded p-2.5" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
                   <div className="flex justify-between items-center">
-                    <span className="text-[8.5px] font-mono block font-bold" style={{ color: 'var(--text-primary)' }}>
+                    <span className="text-[8.5px] font-mono block font-extrabold" style={{ color: 'var(--text-primary)' }}>
                       Multilingual Acoustic Pipeline
                     </span>
                     <button
                       type="button"
                       onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
                       disabled={transcribing}
-                      className={`px-2 py-0.5 rounded border text-[8px] font-mono flex items-center gap-1 cursor-pointer transition-all ${
-                        isRecording ? 'border-red-900 bg-red-950/20 text-red-400 animate-pulse' : 'border-zinc-800 text-brand-cyan hover:border-zinc-700'
+                      className={`px-2 py-1 rounded border text-[8px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                        isRecording ? 'border-red-500 bg-red-500/10 text-red-400 animate-pulse' : 'border-zinc-800 text-brand-cyan hover:border-zinc-700'
                       }`}
                       style={{
                         borderColor: isRecording ? 'var(--accent-red)' : 'var(--border-primary)',
                         color: isRecording ? 'var(--accent-red)' : 'var(--accent-cyan)'
                       }}
                     >
-                      <Mic className="w-2.5 h-2.5" />
-                      {isRecording ? `Recording (${recordingTime}s)` : transcribing ? 'Transcribing...' : 'Record Note'}
+                      <Mic className="w-2.5 h-2.5 animate-pulse" />
+                      {isRecording ? `STOP (${recordingTime}s)` : transcribing ? 'Transcribing...' : 'Record Note'}
                     </button>
                   </div>
 
                   {isRecording && (
-                    <canvas ref={voiceCanvasRef} width={300} height={32} className="w-full h-8 rounded border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }} />
+                    <div className="space-y-1">
+                      <canvas ref={voiceCanvasRef} width={300} height={32} className="w-full h-8 rounded border" style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-secondary)' }} />
+                      <div className="text-[7.5px] font-mono text-zinc-400 text-center animate-pulse">RECORDING ACTIVE SPEECH DATA...</div>
+                    </div>
                   )}
 
                   {/* Dual stage Switch */}
-                  <div className="flex flex-col gap-1 pt-1.5 border-t" style={{ borderColor: 'var(--border-secondary)' }}>
-                    <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
-                      Gemini AI Enhance & Translate Configuration
+                  <div className="flex flex-col gap-1.5 pt-2 border-t" style={{ borderColor: 'var(--border-secondary)' }}>
+                    <span className="text-[8px] font-mono uppercase tracking-wider block font-bold" style={{ color: 'var(--text-muted)' }}>
+                      Gemini AI Enhance & Translate configurations
                     </span>
-                    <div className="grid grid-cols-3 gap-1 p-0.5 rounded border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setAiPipelineMode('off')}
-                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
+                        onClick={() => setAiEnhanceActive(prev => !prev)}
+                        className={`py-1 text-[8.5px] font-mono rounded text-center border font-bold cursor-pointer transition-all ${
+                          aiEnhanceActive ? 'bg-zinc-900 border-current shadow-inner' : 'opacity-60'
+                        }`}
                         style={{
-                          backgroundColor: aiPipelineMode === 'off' ? 'var(--bg-primary)' : 'transparent',
-                          color: aiPipelineMode === 'off' ? 'var(--accent-cyan)' : 'var(--text-muted)'
+                          borderColor: aiEnhanceActive ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                          color: aiEnhanceActive ? 'var(--accent-cyan)' : 'var(--text-muted)'
                         }}
                       >
-                        OFF
+                        STG 1: ENHANCE {aiEnhanceActive ? 'ON' : 'OFF'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAiPipelineMode('enhance')}
-                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
+                        onClick={() => setAiTranslateActive(prev => !prev)}
+                        className={`py-1 text-[8.5px] font-mono rounded text-center border font-bold cursor-pointer transition-all ${
+                          aiTranslateActive ? 'bg-zinc-900 border-current shadow-inner' : 'opacity-60'
+                        }`}
                         style={{
-                          backgroundColor: aiPipelineMode === 'enhance' ? 'var(--bg-primary)' : 'transparent',
-                          color: aiPipelineMode === 'enhance' ? 'var(--accent-cyan)' : 'var(--text-muted)'
+                          borderColor: aiTranslateActive ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                          color: aiTranslateActive ? 'var(--accent-cyan)' : 'var(--text-muted)'
                         }}
                       >
-                        STG 1: ENHANCE
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAiPipelineMode('translate')}
-                        className="py-1 text-[8.5px] font-mono rounded text-center cursor-pointer"
-                        style={{
-                          backgroundColor: aiPipelineMode === 'translate' ? 'var(--bg-primary)' : 'transparent',
-                          color: aiPipelineMode === 'translate' ? 'var(--accent-cyan)' : 'var(--text-muted)'
-                        }}
-                      >
-                        STG 2: TRANSLATE
+                        STG 2: TRANSLATE {aiTranslateActive ? 'ON' : 'OFF'}
                       </button>
                     </div>
+                    {aiTranslateActive && (
+                      <div className="flex items-center justify-between text-[8px] font-mono border-t pt-1.5" style={{ borderColor: 'var(--border-secondary)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>SELECT SOURCE DIALECT:</span>
+                        <select
+                          value={selectedDialect}
+                          onChange={(e) => setSelectedDialect(e.target.value)}
+                          className="bg-zinc-900 border rounded px-1 text-[8px] font-mono"
+                          style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="Telugu">Telugu</option>
+                          <option value="Hindi">Hindi</option>
+                          <option value="Spanish">Spanish</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Description notes */}
                 <div className="space-y-1">
-                  <label className="block text-[8px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <label className="block text-[8px] font-mono uppercase tracking-wider font-bold" style={{ color: 'var(--text-muted)' }}>
                     Observational transcript
                   </label>
                   <textarea 
@@ -670,8 +869,8 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                     style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
                   />
                   {languageBadge && (
-                    <div className="flex items-center gap-1 text-[8px] font-mono text-brand-cyan uppercase tracking-wider mt-1">
-                      <Languages className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1 text-[8.5px] font-mono text-brand-cyan uppercase tracking-wider mt-1 font-bold">
+                      <Languages className="w-3.5 h-3.5" style={{ color: 'var(--accent-cyan)' }} />
                       <span>{languageBadge}</span>
                     </div>
                   )}
@@ -682,7 +881,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 font-bold font-mono text-[10px] tracking-wider uppercase rounded cursor-pointer transition-all flex items-center justify-center gap-1 shadow-lg border animate-pulse"
+                className="w-full py-2.5 font-bold font-mono text-[10px] tracking-wider uppercase rounded cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-lg border hover:brightness-110 active:scale-[0.99]"
                 style={{
                   backgroundColor: 'var(--bg-secondary)',
                   borderColor: 'var(--accent-cyan)',
@@ -697,14 +896,14 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
             {/* Submitting CLI logs */}
             {isSubmitting && (
-              <div className="absolute inset-0 z-50 p-4 font-mono text-[9px] flex flex-col" style={{ backgroundColor: 'rgba(9, 15, 16, 0.97)', color: 'var(--accent-cyan)' }}>
+              <div className="absolute inset-0 z-50 p-4 font-mono text-[9px] flex flex-col" style={{ backgroundColor: 'rgba(9, 15, 16, 0.98)', color: 'var(--accent-cyan)' }}>
                 <div className="flex items-center gap-1.5 border-b pb-2 mb-3" style={{ borderColor: 'var(--border-secondary)' }}>
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
                   <span className="text-white font-bold uppercase tracking-widest text-[9.5px]">Zelus Swarm Triage dispatch</span>
                 </div>
                 <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                   {cliLogs.map((log, idx) => (
-                    <div key={idx} className={log.includes('SUCCESS') ? 'text-brand-emerald' : 'text-zinc-350'}>
+                    <div key={idx} className={log.includes('SUCCESS') || log.includes('🟢') ? 'text-emerald-400 font-bold' : 'text-zinc-350'}>
                       {log}
                     </div>
                   ))}
@@ -715,8 +914,8 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
             {/* Success alert screen */}
             {showSuccessAlert && (
-              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 p-5 border rounded-lg text-center shadow-2xl z-40 space-y-3" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-                <CheckCircle2 className="w-10 h-10 mx-auto" style={{ color: 'var(--accent-cyan)' }} />
+              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 p-5 border rounded-xl text-center shadow-2xl z-40 space-y-4" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                <CheckCircle2 className="w-10 h-10 mx-auto animate-bounce" style={{ color: 'var(--accent-cyan)' }} />
                 <div>
                   <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>DISTRESS RECORD COMMITTED</h4>
                   <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -728,8 +927,8 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                     setShowSuccessAlert(false);
                     setActiveTab('marketplace');
                   }}
-                  className="w-full py-1 bg-zinc-900 border rounded text-[9.5px] font-mono cursor-pointer transition-colors"
-                  style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}
+                  className="w-full py-1.5 bg-zinc-900 border rounded text-[9.5px] font-mono font-bold cursor-pointer transition-colors hover:bg-zinc-800 text-white"
+                  style={{ borderColor: 'var(--border-secondary)' }}
                 >
                   Return to Marketplace
                 </button>
@@ -740,9 +939,9 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
         {/* TAB 3: CIVIC KARMA LEDGER */}
         {activeTab === 'ledger' && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-slide-down">
             <div>
-              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <h3 className="text-sm font-extrabold uppercase tracking-tight flex items-center gap-2 animate-pulse" style={{ color: 'var(--text-primary)' }}>
                 <Award className="w-4 h-4" style={{ color: 'var(--accent-cyan)' }} />
                 Civic Karma Ledger
               </h3>
@@ -752,16 +951,16 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
             </div>
 
             {/* Progression Radial Progress bar */}
-            <div className="border rounded-lg p-5 flex items-center justify-between shadow-lg" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+            <div className="border rounded-lg p-5 flex items-center justify-between shadow-lg bg-zinc-950/10" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
               <div className="space-y-1.5 flex-1 pr-4">
-                <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-[8px] font-mono uppercase tracking-wider block font-bold" style={{ color: 'var(--text-muted)' }}>
                   Karma XP Progression
                 </span>
-                <h4 className="text-sm font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                <h4 className="text-sm font-extrabold font-sans" style={{ color: 'var(--text-primary)' }}>
                   {session.username}
                 </h4>
                 <p className="text-[9px] uppercase font-bold tracking-widest font-mono" style={{ color: 'var(--accent-cyan)' }}>
-                  {session.karmaXP >= 300 ? 'INFRASTRUCTURE GUARD' : 'WATER WATCHER'}
+                  {session.karmaXP >= 220 ? 'INFRASTRUCTURE GUARD' : 'WATER WATCHER'}
                 </p>
               </div>
 
@@ -790,40 +989,40 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
             {/* Badges credentials */}
             <div className="space-y-2">
-              <span className="text-[9px] font-mono uppercase tracking-wider block font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[9px] font-mono uppercase tracking-wider block font-bold font-semibold" style={{ color: 'var(--text-muted)' }}>
                 System Badges
               </span>
               <div className="grid grid-cols-2 gap-2">
-                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all" style={{
+                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all bg-zinc-950/15" style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-secondary)',
                   opacity: session.karmaXP >= 100 ? 1 : 0.4
                 }}>
                   <Award className="w-4 h-4" style={{ color: session.karmaXP >= 100 ? 'var(--accent-cyan)' : 'var(--text-muted)' }} />
                   <div>
-                    <span className="text-[9.5px] font-bold block" style={{ color: 'var(--text-primary)' }}>Water Watcher</span>
+                    <span className="text-[9.5px] font-bold block text-white" style={{ color: 'var(--text-primary)' }}>Water Watcher</span>
                     <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>Initial badge unlocked</span>
                   </div>
                 </div>
 
-                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all" style={{
+                <div className="border p-2.5 rounded-lg flex flex-col justify-between h-20 transition-all bg-zinc-950/15" style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-secondary)',
                   opacity: session.karmaXP >= 220 ? 1 : 0.4
                 }}>
                   <Award className="w-4 h-4" style={{ color: session.karmaXP >= 220 ? 'var(--accent-amber)' : 'var(--text-muted)' }} />
                   <div>
-                    <span className="text-[9.5px] font-bold block" style={{ color: 'var(--text-primary)' }}>Infrastructure Guard</span>
+                    <span className="text-[9.5px] font-bold block text-white" style={{ color: 'var(--text-primary)' }}>Infrastructure Guard</span>
                     <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>Active reporter status</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* XP log audit timeline */}
+            {/* XP log audit ledger */}
             <div className="border rounded-lg p-3 space-y-2" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
-              <span className="text-[8px] font-mono uppercase tracking-wider block" style={{ color: 'var(--text-muted)' }}>
-                XP TRANSACTION TIMELINE LOGS
+              <span className="text-[8.5px] font-mono uppercase tracking-wider block font-bold" style={{ color: 'var(--text-muted)' }}>
+                XP VERIFICATION TIMELINE AUDIT
               </span>
               <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                 {karmaTransactions.map(tx => (
@@ -832,7 +1031,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                       <span style={{ color: 'var(--text-primary)' }}>{tx.msg}</span>
                       <span className="text-[7.5px]" style={{ color: 'var(--text-muted)' }}>{tx.time}</span>
                     </div>
-                    <span className="font-bold" style={{ color: tx.xp.includes('+') ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
+                    <span className="font-extrabold text-[8.5px]" style={{ color: tx.xp.includes('+') ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
                       {tx.xp}
                     </span>
                   </div>
@@ -856,7 +1055,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{selectedBounty.category}</h4>
+              <h4 className="text-xs font-bold text-white" style={{ color: 'var(--text-primary)' }}>{selectedBounty.category}</h4>
               <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{selectedBounty.location}</p>
               <div className="p-2.5 border rounded text-[10px] leading-relaxed font-sans" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-primary)' }}>
                 {selectedBounty.description || 'No description notes.'}
@@ -875,10 +1074,10 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                   <button 
                     type="button" 
                     onClick={startHandshake}
-                    className="w-full py-1.5 font-bold font-mono text-[9px] uppercase rounded cursor-pointer"
+                    className="w-full py-1.5 font-bold font-mono text-[9px] uppercase rounded cursor-pointer transition-all"
                     style={{ backgroundColor: 'var(--accent-cyan)', color: 'var(--bg-primary)' }}
                   >
-                    Cast Verification Signature
+                    Cast Verification Signature (+30 XP)
                   </button>
                 )}
 
@@ -909,7 +1108,7 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
 
             {selectedBounty.progressPhoto && (
               <div className="space-y-1">
-                <span className="text-[8px] font-mono uppercase tracking-widest block font-semibold" style={{ color: 'var(--text-muted)' }}>Contractor Submission Photo</span>
+                <span className="text-[8px] font-mono uppercase tracking-widest block font-bold" style={{ color: 'var(--text-muted)' }}>Contractor Submission Photo</span>
                 <div className="w-full h-24 rounded overflow-hidden border" style={{ borderColor: 'var(--border-secondary)' }}>
                   <img src={selectedBounty.progressPhoto} alt="Progress completion evidence" className="w-full h-full object-cover" />
                 </div>
@@ -923,8 +1122,8 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
                 addKarmaLog(`Cast Consensus Upvote: ${selectedBounty.id}`, '+10 XP');
                 setSelectedBounty(prev => prev ? { ...prev, upvotes: prev.upvotes + 1 } : null);
               }}
-              className="w-full py-1.5 border rounded text-[9.5px] font-mono cursor-pointer transition-colors"
-              style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+              className="w-full py-2 border rounded text-[9.5px] font-mono font-bold cursor-pointer transition-colors hover:bg-zinc-800 text-white"
+              style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}
             >
               Upvote Issue ({selectedBounty.upvotes} Votes)
             </button>
@@ -936,19 +1135,19 @@ export const CitizenSimulator: React.FC<CitizenSimulatorProps> = ({
       <div className="absolute bottom-0 inset-x-0 h-14 border-t grid grid-cols-3 z-35 select-none" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
         <button
           onClick={() => { setActiveTab('marketplace'); setSelectedBounty(null); stopCamera(); }}
-          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all animate-pulse"
+          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all"
           style={{ color: activeTab === 'marketplace' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
         >
-          <Coins className="w-4 h-4" />
+          <Coins className="w-4 h-4 animate-pulse" />
           <span className="text-[8px] font-mono uppercase font-bold tracking-widest">Market</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('report'); setSelectedBounty(null); startCamera(); }}
-          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all animate-pulse"
+          className="flex flex-col items-center justify-center gap-1 cursor-pointer transition-all"
           style={{ color: activeTab === 'report' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
         >
-          <Camera className="w-4 h-4" />
+          <Camera className="w-4 h-4 animate-pulse" />
           <span className="text-[8px] font-mono uppercase font-bold tracking-widest">Report</span>
         </button>
 

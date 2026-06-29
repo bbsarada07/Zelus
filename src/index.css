@@ -11,37 +11,37 @@
 :root {
   color-scheme: dark;
   --bg-primary: #090F10;
-  --bg-secondary: #0E1719;
-  --bg-card: rgba(14, 23, 25, 0.7);
-  --bg-card-raw: #0E1719;
-  --border-primary: rgba(0, 255, 204, 0.2);
-  --border-secondary: rgba(255, 255, 255, 0.08);
-  --text-primary: #F4F4F5;
-  --text-secondary: #00FFCC; /* Toxic Green accent */
-  --text-muted: #7E9C9F;
+  --bg-secondary: #111A1C;
+  --bg-card: #111A1C;
+  --bg-card-raw: #111A1C;
+  --border-primary: #00FFCC;
+  --border-secondary: #1A2629;
+  --text-primary: #FFFFFF;
+  --text-secondary: #00FFCC;
+  --text-muted: #64748B;
   --accent-cyan: #00FFCC;
   --accent-amber: #FFCC00;
   --accent-red: #FF3B30;
   --accent-red-hover: #E62A20;
-  --grid-line: rgba(0, 255, 204, 0.05);
+  --grid-line: rgba(0, 255, 204, 0.03);
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-primary: #FDFBF7;
-  --bg-secondary: #F5F2EB;
-  --bg-card: rgba(245, 242, 235, 0.9);
-  --bg-card-raw: #F5F2EB;
-  --border-primary: rgba(0, 102, 80, 0.45);
-  --border-secondary: rgba(0, 0, 0, 0.18);
-  --text-primary: #090F10;
-  --text-secondary: #006650; /* Deep high-contrast emerald-cyan */
-  --text-muted: #3D4F51;
-  --accent-cyan: #006650;
-  --accent-amber: #944200;
-  --accent-red: #B0120A;
-  --accent-red-hover: #940B04;
-  --grid-line: rgba(0, 102, 80, 0.07);
+  --bg-primary: #F4F6F6;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-raw: #FFFFFF;
+  --border-primary: #0A46E4;
+  --border-secondary: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #0A46E4; /* Deep Cobalt */
+  --text-muted: #475569;
+  --accent-cyan: #05B375; /* Vibrant Emerald */
+  --accent-amber: #D97706; /* Warning Gold (amber) */
+  --accent-red: #DC2626;
+  --accent-red-hover: #B91C1C;
+  --grid-line: rgba(10, 70, 228, 0.03);
 }
 
 body {

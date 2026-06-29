@@ -46,6 +46,12 @@ export interface Incident {
   progressPhoto?: string;
   verifications?: VerificationLog[];
   webhookLogs?: WebhookLog[];
+  materials?: string[];
+  costBreakdown?: {
+    materials: number;
+    labor: number;
+    total: number;
+  };
 }
 
 export type UserRole = 'Admin' | 'Citizen' | 'Contractor';

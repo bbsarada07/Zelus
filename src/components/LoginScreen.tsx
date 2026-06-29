@@ -230,10 +230,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
     setRole(newRole);
     if (newRole === 'Admin') {
       setUsername('admin_zero');
+      setPassword('•••••••••admin');
     } else if (newRole === 'Contractor') {
       setUsername('contractor_alpha');
+      setPassword('•••••••••contractor');
     } else {
       setUsername('citizen_hero');
+      setPassword('•••••••••citizen');
     }
     const audioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (audioCtx) {
@@ -266,7 +269,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
     : 'var(--accent-cyan)';
 
   return (
-    <div className="flex-1 flex items-center justify-center min-h-[calc(100vh-4rem)] p-4 relative overflow-hidden select-none">
+    <div className="flex-1 flex flex-col lg:flex-row min-h-screen relative overflow-hidden select-none" style={{ backgroundColor: 'var(--bg-primary)' }}>
       
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes customGlitch {
@@ -285,22 +288,48 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
       {/* Grid Nodes Animated Background */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ background: 'transparent' }} />
 
-      {/* Background Radial Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: `${accentColorStyle}08` }} />
-
-      {/* Left side Vertical Log Stream Ticker */}
-      <div className="hidden lg:flex absolute left-8 top-8 bottom-8 w-72 flex-col font-mono text-[9px] overflow-hidden pointer-events-none select-none z-10">
-        <div className="text-[10px] font-bold uppercase tracking-widest mb-3 border-b pb-2 flex items-center gap-1.5" style={{ color: 'var(--text-primary)', borderBottomColor: 'var(--border-secondary)' }}>
-          <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: 'var(--accent-cyan)' }} />
-          Node Operations Stream
+      {/* LEFT SIDE: SLEEK TELEMETRY STREAM CONSOLE */}
+      <div className="hidden lg:flex w-[40%] border-r relative flex-col justify-between p-8 font-mono text-[10px] select-none z-10 overflow-hidden" 
+           style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+        
+        {/* Glow */}
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: `radial-gradient(circle at 30% 30%, ${accentColorStyle}05 0%, transparent 60%)` }} />
+        
+        <div>
+          <div className="text-xs font-bold uppercase tracking-widest mb-3 border-b pb-2 flex items-center gap-2" style={{ color: 'var(--text-primary)', borderBottomColor: 'var(--border-secondary)' }}>
+            <span className="w-2 h-2 rounded-full bg-current animate-ping" style={{ color: 'var(--accent-cyan)' }} />
+            SYSTEM TELEMETRY ENGINE // NODE DISPATCH
+          </div>
+          
+          {/* Diagnostics Bento Box Inside Telemetry Stream */}
+          <div className="grid grid-cols-2 gap-2 mb-6 p-3 border rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
+            <div>
+              <span className="block text-[7.5px] uppercase tracking-wider">THREAT INDEX</span>
+              <strong className="text-[11px] font-bold" style={{ color: 'var(--accent-cyan)' }}>x{threatIndex.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span className="block text-[7.5px] uppercase tracking-wider">ACTIVE NODES</span>
+              <strong className="text-[11px] font-bold" style={{ color: 'var(--accent-cyan)' }}>{activeNodes} Wards</strong>
+            </div>
+            <div className="mt-1">
+              <span className="block text-[7.5px] uppercase tracking-wider">THROUGHPUT</span>
+              <strong className="text-[11px] font-bold" style={{ color: 'var(--accent-amber)' }}>{throughput.toFixed(1)} MB/s</strong>
+            </div>
+            <div className="mt-1">
+              <span className="block text-[7.5px] uppercase tracking-wider">SECURE ENCLAVE</span>
+              <strong className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>SHA-256 SYNC</strong>
+            </div>
+          </div>
         </div>
-        <div className="space-y-1.5 flex-1 flex flex-col justify-start overflow-hidden">
+
+        {/* Telemetry scrolling feed */}
+        <div className="flex-1 space-y-2 flex flex-col-reverse justify-end overflow-hidden mb-6">
           {terminalLogs.map((log, idx) => {
             const isCoord = log.includes('coordinates') || log.includes('GPS');
             const isFleet = log.includes('DISPATCHED') || log.includes('Fleet');
             const isSystem = log.includes('SYSTEM') || log.includes('FIREWALL');
             
-            let color = "var(--text-muted)";
+            let color = "var(--accent-cyan)"; // Default toxic green/accent
             if (isCoord) color = "var(--accent-cyan)";
             if (isFleet) color = "var(--accent-cyan)";
             if (isSystem) color = "var(--accent-amber)";
@@ -308,200 +337,170 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark
             return (
               <div 
                 key={idx} 
-                className="truncate transition-opacity duration-300 font-semibold"
-                style={{ opacity: Math.max(0.05, 1 - (idx / 18)), color }}
+                className="truncate transition-opacity duration-300 font-semibold text-[10px] tracking-tight leading-normal"
+                style={{ opacity: Math.max(0.1, 1 - (idx / 18)), color }}
               >
                 {log}
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* Corner Diagnostics Bento Box - Top Left */}
-      <div className="hidden sm:block absolute top-6 left-6 border rounded p-2.5 z-10 font-mono text-[9px] space-y-0.5 backdrop-blur-md pointer-events-none select-none" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
-        <div className="text-[7.5px] uppercase tracking-widest">DATA CORE STATS</div>
-        <div className="flex justify-between gap-6">
-          <span>THREAT RISK:</span>
-          <span className="font-semibold" style={{ color: 'var(--accent-cyan)' }}>x{threatIndex.toFixed(2)}</span>
+        <div className="border-t pt-2" style={{ borderColor: 'var(--border-secondary)' }}>
+          <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">
+            SECURE ACCESS GATEWAY CORE // SYSTEM_TELEMETRY_PORTAL
+          </span>
         </div>
       </div>
 
-      {/* Corner Diagnostics Bento Box - Top Right */}
-      <div className="hidden sm:block absolute top-6 right-6 border rounded p-2.5 z-10 font-mono text-[9px] space-y-0.5 backdrop-blur-md pointer-events-none select-none" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
-        <div className="text-[7.5px] uppercase tracking-widest">SPATIAL INDEXER</div>
-        <div className="flex justify-between gap-6">
-          <span>ACTIVE TARGETS:</span>
-          <span className="font-semibold" style={{ color: 'var(--accent-cyan)' }}>{activeNodes} UNITS</span>
-        </div>
-      </div>
+      {/* RIGHT SIDE: AUTHENTICATION FORM & ROLE CARDS */}
+      <div className="flex-1 flex items-center justify-center p-6 md:p-12 z-10 relative">
+        {/* Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full blur-[100px] pointer-events-none" style={{ backgroundColor: `${accentColorStyle}03` }} />
 
-      {/* Corner Diagnostics Bento Box - Bottom Left */}
-      <div className="hidden sm:block absolute bottom-6 left-6 border rounded p-2.5 z-10 font-mono text-[9px] space-y-0.5 backdrop-blur-md pointer-events-none select-none" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
-        <div className="text-[7.5px] uppercase tracking-widest">LEDGER SYNCER</div>
-        <div className="flex justify-between gap-6">
-          <span>THROUGHPUT RATIO:</span>
-          <span className="font-semibold" style={{ color: 'var(--accent-amber)' }}>{throughput.toFixed(1)} MB/S</span>
-        </div>
-      </div>
-
-      {/* Corner Diagnostics Bento Box - Bottom Right */}
-      <div className="hidden sm:block absolute bottom-6 right-6 border rounded p-2.5 z-10 font-mono text-[9px] space-y-0.5 backdrop-blur-md pointer-events-none select-none" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
-        <div className="text-[7.5px] uppercase tracking-widest">SECURE ENCLAVE</div>
-        <div className="flex justify-between gap-6">
-          <span>HANDSHAKE KEYS:</span>
-          <span className="font-bold" style={{ color: 'var(--text-primary)' }}>SHA-256 SYNC</span>
-        </div>
-      </div>
-
-      {/* Central Login Card */}
-      <div className={`w-full max-w-md glass-panel rounded-xl p-8 relative z-10 border shadow-2xl transition-all duration-300 backdrop-blur-lg ${
-        isGlitching ? 'active-glitch-layer border-brand-cyan/60 scale-[1.015]' : ''
-      }`} style={{ borderColor: 'var(--border-secondary)' }}>
-        
-        {/* Upper Brand / Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-lg border flex items-center justify-center mb-3 relative overflow-hidden group" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
-            <Cpu className="w-6 h-6 animate-pulse" style={{ color: 'var(--accent-cyan)' }} />
+        <div className={`w-full max-w-md glass-panel rounded-2xl p-8 relative border shadow-2xl transition-all duration-300 backdrop-blur-lg ${
+          isGlitching ? 'active-glitch-layer border-brand-cyan/60 scale-[1.015]' : ''
+        }`} style={{ borderColor: 'var(--border-secondary)', backgroundColor: 'var(--bg-card)' }}>
+          
+          {/* Upper Brand / Logo */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-12 h-12 rounded-xl border flex items-center justify-center mb-3 relative overflow-hidden group shadow-inner" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
+              <Cpu className="w-6 h-6 animate-pulse" style={{ color: 'var(--accent-cyan)' }} />
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+              ZELUS <span className="text-[10px] border px-1.5 py-0.5 rounded font-mono font-bold" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>ENGINE v2.0.0</span>
+            </h1>
+            <p className="text-xs mt-1 text-center leading-relaxed font-sans" style={{ color: 'var(--text-muted)' }}>
+              AI-Powered Hyperlocal Civic Automation & Triage Ledger
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-            ZELUS <span className="text-[10px] border px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>ENGINE v1.0.0</span>
-          </h1>
-          <p className="text-xs mt-1.5 text-center leading-relaxed font-sans" style={{ color: 'var(--text-muted)' }}>
-            AI-Powered Hyperlocal Civic Automation & Triage Ledger
-          </p>
-        </div>
 
-        {/* Role Selector Toggle */}
-        <div className="grid grid-cols-3 gap-1 p-1 border rounded-lg mb-6" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}>
-          <button
-            type="button"
-            onClick={() => handleRoleChange('Admin')}
-            className={`py-2 text-[10px] font-medium tracking-tight rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-              role === 'Admin'
-                ? 'bg-zinc-800/40 text-brand-cyan border shadow-inner font-semibold'
-                : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-            style={{ 
-              borderColor: role === 'Admin' ? 'var(--border-primary)' : 'transparent',
-              color: role === 'Admin' ? 'var(--accent-cyan)' : 'var(--text-muted)' 
-            }}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            Admin Center
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRoleChange('Citizen')}
-            className={`py-2 text-[10px] font-medium tracking-tight rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-              role === 'Citizen'
-                ? 'bg-zinc-800/40 text-brand-emerald border shadow-inner font-semibold'
-                : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-            style={{ 
-              borderColor: role === 'Citizen' ? 'var(--border-primary)' : 'transparent',
-              color: role === 'Citizen' ? 'var(--accent-cyan)' : 'var(--text-muted)'
-            }}
-          >
-            <User className="w-3.5 h-3.5" />
-            Citizen App
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRoleChange('Contractor')}
-            className={`py-2 text-[10px] font-medium tracking-tight rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-              role === 'Contractor'
-                ? 'bg-zinc-800/40 text-brand-amber border shadow-inner font-semibold'
-                : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-            style={{ 
-              borderColor: role === 'Contractor' ? 'var(--border-primary)' : 'transparent',
-              color: role === 'Contractor' ? 'var(--accent-amber)' : 'var(--text-muted)'
-            }}
-          >
-            <Wrench className="w-3.5 h-3.5" />
-            Contractor Workspace
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          {/* Interactive Role Option Cards */}
+          <div className="space-y-2 mb-6">
             <label className="block text-[10px] font-mono tracking-widest uppercase mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Operator Identifier
+              Select Operational Role Access
             </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: 'var(--text-muted)' }}>
-                <User className="w-4 h-4" />
-              </span>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="w-full pl-9 pr-4 py-2.5 border rounded-md text-sm transition-all font-mono"
-                style={{ 
-                  backgroundColor: 'var(--bg-secondary)', 
-                  borderColor: 'var(--border-secondary)', 
-                  color: 'var(--text-primary)' 
-                }}
-                placeholder="operator_id"
-              />
+            <div className="grid grid-cols-1 gap-2.5">
+              {[
+                { r: 'Admin' as UserRole, name: 'Admin Center', user: 'admin_zero', desc: 'Manage triaged nodes & swarm telemetry workflows' },
+                { r: 'Citizen' as UserRole, name: 'Citizen App', user: 'citizen_hero', desc: 'Simulate reports with AI enhance & verify updates' },
+                { r: 'Contractor' as UserRole, name: 'Contractor Workspace', user: 'contractor_alpha', desc: 'Claim volunteer bounties and verify remediations' }
+              ].map(item => (
+                <div 
+                  key={item.r}
+                  onClick={() => handleRoleChange(item.r)}
+                  className={`border rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.01] ${
+                    role === item.r 
+                      ? 'shadow-md scale-[1.01]' 
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderColor: role === item.r ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                    boxShadow: role === item.r ? `0 0 12px ${role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)'}15` : 'none'
+                  }}
+                >
+                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 mt-0.5`} 
+                       style={{ 
+                         borderColor: role === item.r ? 'var(--accent-cyan)' : 'var(--border-secondary)',
+                         color: role === item.r ? (item.r === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)') : 'var(--text-muted)',
+                         backgroundColor: 'var(--bg-primary)'
+                       }}>
+                    {item.r === 'Admin' ? <Shield className="w-4 h-4" /> : item.r === 'Citizen' ? <User className="w-4 h-4" /> : <Wrench className="w-4 h-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold font-sans" style={{ color: 'var(--text-primary)' }}>{item.name}</span>
+                      {role === item.r && (
+                        <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ backgroundColor: item.r === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)' }} />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-mono tracking-widest uppercase mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Access Token
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: 'var(--text-muted)' }}>
-                <Lock className="w-4 h-4" />
-              </span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full pl-9 pr-4 py-2.5 border rounded-md text-sm transition-all font-mono"
-                style={{ 
-                  backgroundColor: 'var(--bg-secondary)', 
-                  borderColor: 'var(--border-secondary)', 
-                  color: 'var(--text-primary)' 
-                }}
-                placeholder="password"
-              />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-mono tracking-widest uppercase mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Operator Identifier
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: 'var(--text-muted)' }}>
+                  <User className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-xs transition-all font-mono"
+                  style={{ 
+                    backgroundColor: 'var(--bg-secondary)', 
+                    borderColor: 'var(--border-secondary)', 
+                    color: 'var(--text-primary)' 
+                  }}
+                  placeholder="operator_id"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-md font-medium text-xs tracking-tight transition-all duration-300 flex items-center justify-center gap-1.5 border cursor-pointer hover:opacity-90"
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                borderColor: role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)',
-                color: role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)',
-                boxShadow: `0 0 15px ${role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)'}15`
-              }}
-            >
-              {isSubmitting ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  Establish System Connection
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-[10px] font-mono tracking-widest uppercase mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Access Token
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" style={{ color: 'var(--text-muted)' }}>
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-xs transition-all font-mono"
+                  style={{ 
+                    backgroundColor: 'var(--bg-secondary)', 
+                    borderColor: 'var(--border-secondary)', 
+                    color: 'var(--text-primary)' 
+                  }}
+                  placeholder="password"
+                />
+              </div>
+            </div>
 
-        {/* Footer info text */}
-        <div className="mt-8 text-center">
-          <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-            SECURE ACCESS PORTAL // ZELUS PROTOCOL v1.0.0
-          </p>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-4 rounded-lg font-bold text-xs tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-1.5 border cursor-pointer hover:brightness-110"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderColor: role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)',
+                  color: role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)',
+                  boxShadow: `0 0 15px ${role === 'Contractor' ? 'var(--accent-amber)' : 'var(--accent-cyan)'}15`
+                }}
+              >
+                {isSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Establish System Connection
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Footer info text */}
+          <div className="mt-6 text-center">
+            <p className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
+              SECURE ACCESS PORTAL // ZELUS GATEWAY SECURED
+            </p>
+          </div>
         </div>
       </div>
     </div>

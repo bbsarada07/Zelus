@@ -458,136 +458,193 @@ function App() {
     });
   };
 
+  const [isIsolated, setIsIsolated] = useState<boolean>(false);
+
   // ─── BOOT SCREEN ───────────────────────────────────────────────────────────
   if (booting) {
     return <ZetaLoader onComplete={handleBootComplete} theme={theme} />;
   }
 
-  // ─── AUTHENTICATION GATEWAY ────────────────────────────────────────────────
-  if (!session) {
-    return (
-      <div className="min-h-screen flex flex-col justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <LoginScreen onLogin={handleLogin} theme={theme} />
-      </div>
-    );
-  }
+  const renderMainContent = () => {
+    // ─── AUTHENTICATION GATEWAY ────────────────────────────────────────────────
+    if (!session) {
+      return (
+        <div className="min-h-screen flex flex-col justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <LoginScreen onLogin={handleLogin} theme={theme} />
+        </div>
+      );
+    }
 
-  // ─── CITIZEN NATIVE MOBILE LAYOUT VIEWPORT (Strict Mobile layout) ──────────
-  if (session.role === 'Citizen') {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-black/45" style={{ backgroundColor: isDark ? '#040809' : '#EDEAE3' }}>
-        <MobileViewport
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
-          onLogout={handleLogout}
-          username={session.username}
-        >
-          <CitizenSimulator
-            incidents={incidents}
-            onAddIncident={handleAddIncident}
-            onUpvoteIncident={handleUpvoteIncident}
-            session={session}
-            onUpdateKarma={handleUpdateKarma}
+    // ─── CITIZEN NATIVE MOBILE LAYOUT VIEWPORT (Strict Mobile layout) ──────────
+    if (session.role === 'Citizen') {
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center bg-black/45" style={{ backgroundColor: isDark ? '#040809' : '#EDEAE3' }}>
+          <MobileViewport
             theme={theme}
-            onConfirmResolution={handleConfirmResolution}
-          />
-        </MobileViewport>
+            onToggleTheme={handleToggleTheme}
+            onLogout={handleLogout}
+            username={session.username}
+          >
+            <CitizenSimulator
+              incidents={incidents}
+              onAddIncident={handleAddIncident}
+              onUpvoteIncident={handleUpvoteIncident}
+              session={session}
+              onUpdateKarma={handleUpdateKarma}
+              theme={theme}
+              onConfirmResolution={handleConfirmResolution}
+            />
+          </MobileViewport>
+        </div>
+      );
+    }
+
+    // ─── ADMIN & CONTRACTOR DESKTOP PORTAL SHELL ──────────────────────────────
+    const headingText = isDark ? '#ffffff' : '#090F10';
+    const rootBg = 'var(--bg-primary)';
+
+    return (
+      <div
+        className="min-h-screen flex flex-col font-sans transition-all duration-300 pb-20"
+        style={{
+          backgroundColor: rootBg,
+          backgroundImage: isDark
+            ? 'linear-gradient(rgba(0, 255, 204, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 204, 0.02) 1px, transparent 1px)'
+            : 'linear-gradient(rgba(10, 70, 228, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(10, 70, 228, 0.02) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+        }}
+      >
+        {/* Weather status ticker banner */}
+        <div
+          className="w-full py-1.5 px-6 flex items-center justify-between text-[10px] font-mono select-none border-b transition-colors"
+          style={{ 
+            backgroundColor: 'var(--bg-secondary)', 
+            borderColor: 'var(--border-secondary)',
+            color: isIsolated ? 'var(--accent-amber)' : 'var(--text-muted)'
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <CloudLightning className={`w-3.5 h-3.5 ${isIsolated ? 'animate-bounce' : 'animate-pulse'}`} style={{ color: isIsolated ? 'var(--accent-amber)' : 'var(--accent-amber)' }} />
+            <span>{isIsolated ? '⚠️ [DATA ISOLATION ACTIVE] Local ledger isolated from cloud relay.' : tickerMessage}</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-3">
+            <span>Vitals Block synced</span>
+            <span>|</span>
+            <span className="flex items-center gap-1 font-bold" style={{ color: isIsolated ? 'var(--accent-amber)' : 'var(--accent-cyan)' }}>
+              <span className={`w-1.5 h-1.5 rounded-full bg-current ${isIsolated ? 'animate-bounce' : 'animate-ping'}`} />
+              {isIsolated ? 'LOCAL LEDGER STORAGE ONLY' : 'LEDGER SECURE'}
+            </span>
+          </div>
+        </div>
+
+        {/* Main Workspace Frame */}
+        <main className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
+          {session.role === 'Admin' ? (
+            <div className="flex-1 flex flex-col">
+              <GovernmentDashboard
+                incidents={incidents}
+                onAuthorizeDispatch={handleAuthorizeDispatch}
+                weatherRiskMultiplier={weatherMultiplier}
+                onAddIncident={handleAddIncident}
+                theme={theme}
+                onLogout={handleLogout}
+                onToggleTheme={handleToggleTheme}
+                username={session.username}
+                isIsolated={isIsolated}
+                onToggleIsolation={() => setIsIsolated(prev => !prev)}
+              />
+            </div>
+          ) : (
+            <div className="space-y-4 flex-1 flex flex-col">
+              {/* Contractor Page Header Bar */}
+              <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight" style={{ color: headingText }}>
+                    Volunteer Contractor Operations Command
+                  </h1>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Remediate local infrastructure failures, earn sponsorships, and verify repair completions.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button 
+                    onClick={handleToggleTheme}
+                    className="p-1.5 rounded border hover:bg-zinc-800/10 cursor-pointer"
+                    style={{ borderColor: 'var(--border-secondary)' }}
+                    title="Toggle Theme"
+                  >
+                    <Smartphone className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 rounded bg-zinc-900 border text-[10px] font-mono font-bold hover:bg-red-500/15 hover:border-red-500/40 text-red-400 cursor-pointer"
+                    style={{ borderColor: 'var(--border-secondary)' }}
+                  >
+                    Disconnect Profile
+                  </button>
+                </div>
+              </div>
+
+              <ContractorDashboard
+                incidents={incidents}
+                session={session}
+                onClaimBounty={handleClaimBounty}
+                onSubmitProgress={handleSubmitProgress}
+                onUpdateStage={handleUpdateStage}
+                theme={theme}
+              />
+            </div>
+          )}
+        </main>
       </div>
     );
-  }
-
-  // ─── ADMIN & CONTRACTOR DESKTOP PORTAL SHELL ──────────────────────────────
-  const headingText = isDark ? '#ffffff' : '#090F10';
-  const rootBg = 'var(--bg-primary)';
+  };
 
   return (
-    <div
-      className="min-h-screen flex flex-col font-sans transition-all duration-300"
-      style={{
-        backgroundColor: rootBg,
-        backgroundImage: isDark
-          ? 'linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px)'
-          : 'linear-gradient(rgba(0, 102, 80, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 102, 80, 0.05) 1px, transparent 1px)',
-        backgroundSize: '32px 32px',
-      }}
-    >
-      {/* Weather status ticker banner */}
-      <div
-        className="w-full py-1.5 px-6 flex items-center justify-between text-[10px] font-mono select-none border-b"
-        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-secondary)' }}
+    <>
+      {renderMainContent()}
+      
+      {/* Testing/Demo Mode Persistent Swapper Bar */}
+      <div 
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 glass-panel border rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl backdrop-blur-md" 
+        style={{ 
+          borderColor: 'var(--border-primary)', 
+          backgroundColor: 'var(--bg-card)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+        }}
       >
-        <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-          <CloudLightning className="w-3.5 h-3.5 animate-pulse" style={{ color: 'var(--accent-amber)' }} />
-          <span>{tickerMessage}</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-3" style={{ color: 'var(--text-muted)' }}>
-          <span>Vitals Block synced</span>
-          <span>|</span>
-          <span className="flex items-center gap-1 font-bold" style={{ color: 'var(--accent-cyan)' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
-            LEDGER SECURE
-          </span>
-        </div>
+        <span className="text-[9px] font-mono tracking-widest uppercase mr-1" style={{ color: 'var(--text-muted)' }}>
+          DEMO MODE:
+        </span>
+        <button 
+          onClick={() => handleLogin('admin_zero', 'Admin')}
+          className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all font-bold cursor-pointer ${session?.role === 'Admin' ? 'text-zinc-950 font-extrabold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+          style={session?.role === 'Admin' ? { backgroundColor: 'var(--accent-cyan)' } : {}}
+        >
+          Admin
+        </button>
+        <button 
+          onClick={() => handleLogin('citizen_hero', 'Citizen')}
+          className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all font-bold cursor-pointer ${session?.role === 'Citizen' ? 'text-zinc-950 font-extrabold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+          style={session?.role === 'Citizen' ? { backgroundColor: 'var(--accent-cyan)' } : {}}
+        >
+          Citizen
+        </button>
+        <button 
+          onClick={() => handleLogin('contractor_alpha', 'Contractor')}
+          className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all font-bold cursor-pointer ${session?.role === 'Contractor' ? 'text-zinc-950 font-extrabold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+          style={session?.role === 'Contractor' ? { backgroundColor: 'var(--accent-amber)' } : {}}
+        >
+          Contractor
+        </button>
+        <button 
+          onClick={handleLogout}
+          className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all font-bold cursor-pointer ${!session ? 'bg-red-500 text-white font-extrabold shadow-sm' : 'text-zinc-400 hover:text-red-400'}`}
+        >
+          Access Portal
+        </button>
       </div>
-
-      {/* Main Workspace Frame */}
-      <main className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
-        {session.role === 'Admin' ? (
-          <div className="flex-1 flex flex-col">
-            <GovernmentDashboard
-              incidents={incidents}
-              onAuthorizeDispatch={handleAuthorizeDispatch}
-              weatherRiskMultiplier={weatherMultiplier}
-              onAddIncident={handleAddIncident}
-              theme={theme}
-              onLogout={handleLogout}
-              onToggleTheme={handleToggleTheme}
-              username={session.username}
-            />
-          </div>
-        ) : (
-          <div className="space-y-4 flex-1 flex flex-col">
-            {/* Contractor Page Header Bar */}
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight" style={{ color: headingText }}>
-                  Volunteer Contractor Operations Command
-                </h1>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Remediate local infrastructure failures, earn sponsorships, and verify repair completions.
-                </p>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <button 
-                  onClick={handleToggleTheme}
-                  className="p-1.5 rounded border hover:bg-zinc-800/10 cursor-pointer"
-                  style={{ borderColor: 'var(--border-secondary)' }}
-                  title="Toggle Theme"
-                >
-                  <Smartphone className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 rounded bg-zinc-900 border text-[10px] font-mono font-bold hover:bg-red-500/15 hover:border-red-500/40 text-red-400 cursor-pointer"
-                  style={{ borderColor: 'var(--border-secondary)' }}
-                >
-                  Disconnect Profile
-                </button>
-              </div>
-            </div>
-
-            <ContractorDashboard
-              incidents={incidents}
-              session={session}
-              onClaimBounty={handleClaimBounty}
-              onSubmitProgress={handleSubmitProgress}
-              onUpdateStage={handleUpdateStage}
-              theme={theme}
-            />
-          </div>
-        )}
-      </main>
-    </div>
+    </>
   );
 }
 
