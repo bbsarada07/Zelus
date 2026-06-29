@@ -250,53 +250,73 @@ export const CitizenSimulator: React.FC = () => {
 
   const PROCESSING_STEPS = [
     '[ANALYZING VISUAL PRESET EVIDENCE...]',
-    '[COMPUTING STRUCTURAL PRIORITY CRITERIA...]',
+    '[COMPUTING NATIVE GPS ROUTING SECTOR...]',
     '[COMMITTING IMMUTABLE CIVIC REGISTRY ENTITY...]',
   ];
 
-  // Initialize simulated GPS coordinates
+  // Geolocation & reverse-geocoding engine state
+  const [geoCoords, setGeoCoords] = useState<{lat:number;lng:number}>({ lat: 17.4501, lng: 78.5252 });
+  const [addressString, setAddressString] = useState('Tech Park Precinct, Sector 4, Ward Block 12');
+
+  const getSimulatedAddress = (lat: number, lng: number): string => {
+    const dLat = Math.abs(lat - Math.floor(lat));
+    const dLng = Math.abs(lng - Math.floor(lng));
+    const sum = Math.floor((dLat + dLng) * 100000) % 4;
+    const sectors = ['Sector 4, Ward Block 12', 'Sector 2, Transit Hub Corridor', 'Sector 9, Residential Quarter', 'Sector 5, Industrial Grid Node'];
+    const precincts = ['Tech Park Precinct', 'Metro Terminal Plaza', 'Lake View Boulevard', 'Downtown Commerce Hub'];
+    return `${precincts[sum]}, ${sectors[sum]}`;
+  };
+
+  // Mount native GPS extraction & fallback loader
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setReportX(parseFloat((35 + Math.abs((pos.coords.longitude * 100) % 40)).toFixed(1)));
-          setReportY(parseFloat((35 + Math.abs((pos.coords.latitude * 100) % 40)).toFixed(1)));
-          setReportLocation(`${pos.coords.latitude.toFixed(4)}°N, ${pos.coords.longitude.toFixed(4)}°E`);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setGeoCoords({ lat, lng });
+          setReportX(parseFloat((35 + Math.abs((lng * 100) % 40)).toFixed(1)));
+          setReportY(parseFloat((35 + Math.abs((lat * 100) % 40)).toFixed(1)));
+          setAddressString(getSimulatedAddress(lat, lng));
+          setReportLocation(`${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`);
         },
         () => {
-          setReportLocation('17.4501°N, 78.5252°E (Simulated)');
-        }
+          addToast('⚠️ Native GPS restricted. Bootstrapping Local Hackathon Precinct Hub Grid.', 'warning');
+          const lat = 17.4501;
+          const lng = 78.5252;
+          setGeoCoords({ lat, lng });
+          setReportX(48.2);
+          setReportY(61.9);
+          setAddressString(getSimulatedAddress(lat, lng));
+          setReportLocation(`${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E (Simulated)`);
+        },
+        { timeout: 4000 }
       );
+    } else {
+      addToast('⚠️ Native GPS restricted. Bootstrapping Local Hackathon Precinct Hub Grid.', 'warning');
+      const lat = 17.4501;
+      const lng = 78.5252;
+      setGeoCoords({ lat, lng });
+      setReportX(48.2);
+      setReportY(61.9);
+      setAddressString(getSimulatedAddress(lat, lng));
+      setReportLocation(`${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E (Simulated)`);
     }
-  }, []);
+  }, [addToast]);
 
-  // Sync camera canvas
-  useEffect(() => {
-    if (cameraActive && !activeScene && cameraCanvasRef.current) {
-      const canvas = cameraCanvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.fillStyle = '#060B0C';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = 'rgba(0,255,204,0.4)'; ctx.lineWidth = 1;
-      ctx.setLineDash([4,4]);
-      ctx.beginPath(); ctx.moveTo(canvas.width/2,0); ctx.lineTo(canvas.width/2,canvas.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,canvas.height/2); ctx.lineTo(canvas.width,canvas.height/2); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.strokeStyle = '#00FFCC'; ctx.lineWidth = 2;
-      const cx=canvas.width/2, cy=canvas.height/2;
-      [[cx-50,cy-35],[cx+50,cy-35],[cx-50,cy+35],[cx+50,cy+35]].forEach(([x,y]) => {
-        const dx = x<cx?1:-1, dy = y<cy?1:-1;
-        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx*12,y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+dy*12); ctx.stroke();
-      });
-      ctx.fillStyle = 'rgba(0,255,204,0.6)';
-      ctx.font = '10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('[ SELECT SCENE PRESET BELOW ]', canvas.width/2, canvas.height-10);
-      ctx.textAlign = 'left';
-    }
-  }, [cameraActive, activeScene]);
+  // Proximity geofencing calculation
+  const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const dLat = (lat1 - lat2) * 111;
+    const dLng = (lng1 - lng2) * 105;
+    return Math.sqrt(dLat * dLat + dLng * dLng);
+  };
+
+  const nearbyAnomalies = incidents.filter(inc => {
+    if (inc.status === 'Resolved') return false;
+    const incGeo = inc.geolocation || { lat: 17.4501, lng: 78.5252 };
+    const dist = getDistanceKm(geoCoords.lat, geoCoords.lng, incGeo.lat, incGeo.lng);
+    return dist <= 1.0;
+  });
 
   // Activate Camera Simulator HUD
   const activateCamera = () => {
@@ -309,9 +329,15 @@ export const CitizenSimulator: React.FC = () => {
   const selectPreset = (key: ScenePreset) => {
     const data = PRESETS[key];
     setReportCategory(data.category);
-    setReportLocation(data.location);
+    
+    // Auto-fill latitude/longitude to match preset location
+    const presetLat = key === 'pothole' ? 17.4485 : key === 'water' ? 17.4512 : 17.4461;
+    const presetLng = key === 'pothole' ? 78.5204 : key === 'water' ? 78.5289 : 78.5178;
+    setGeoCoords({ lat: presetLat, lng: presetLng });
     setReportX(data.x);
     setReportY(data.y);
+    setReportLocation(data.location);
+    setAddressString(getSimulatedAddress(presetLat, presetLng));
     setReportNotes(data.notes);
     setReportSeverity(data.severity);
     setActiveScene(key);
@@ -344,10 +370,9 @@ export const CitizenSimulator: React.FC = () => {
     setTimeout(() => {
       setTranscribing(false);
       const rawText = TRANSLATIONS[selectedLanguage] || TRANSLATIONS.Mandarin;
-      // We will output a clean English translation
       const engTranslation = "This civic report documents observable degradation of a municipal infrastructure node. The damage severity classification warrants priority dispatch of a qualified maintenance team for immediate assessment and remediation.";
       
-      setTranscriptText(`Raw Ingestion:\n"${rawText}"\n\nEnglish Translation:\n"${engTranslation}"\n\n[AUDIO SOURCE LOCALIZED -> TRANSLATED FROM ${selectedLanguage.toUpperCase()} TO EN-US | ACCURACY: 99.1%]`);
+      setTranscriptText(`Raw Ingestion:\n"${rawText}"\n\nEnglish Translation:\n"${engTranslation}"\n\n[AUDIO SOURCE LOCALIZED -> TRANSLATED FROM LOCAL DIALECT TO EN-US ACCURACY: 99.1%]`);
       setReportNotes(engTranslation);
     }, 1500);
   };
@@ -385,7 +410,7 @@ export const CitizenSimulator: React.FC = () => {
           languageBadge: languageBadge,
           image: activeScene ? `/${activeScene}.png` : '/road_pothole.png',
           notes: reportNotes || transcriptText,
-          geolocation: { lat: 17.4501 + (reportY - 50) * 0.001, lng: 78.5252 + (reportX - 50) * 0.001 },
+          geolocation: { lat: geoCoords.lat, lng: geoCoords.lng },
           exifVerified: true,
           hash: `0x${Array.from({length:16},()=>Math.floor(Math.random()*16).toString(16)).join('').toUpperCase()}`,
           materials: [],
@@ -404,7 +429,7 @@ export const CitizenSimulator: React.FC = () => {
         setSubmitPhase('success');
       }
     }, 500); // 3 steps * 500ms = 1.5 seconds exactly
-  }, [reportNotes, transcriptText, reportCategory, reportLocation, reportX, reportY, reportSeverity, languageBadge, activeScene, addIncident, updateKarma, addToast]);
+  }, [reportNotes, transcriptText, reportCategory, reportLocation, reportX, reportY, reportSeverity, languageBadge, activeScene, geoCoords, addIncident, updateKarma, addToast]);
 
   const resetForm = () => {
     setSubmitPhase('form');
@@ -441,6 +466,38 @@ export const CitizenSimulator: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+
+      {/* Proximity Radar Matrix Section */}
+      <div className="p-3 bg-var(--bg-secondary) border-b" style={{ borderColor: 'var(--border-secondary)' }}>
+        <div className="rounded-xl border p-3.5 space-y-3 relative overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-secondary)' }}>
+          <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--border-secondary)' }}>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="text-[10px] font-mono font-bold text-[var(--text-primary)] uppercase tracking-wider">Hyperlocal Proximity Radar</span>
+            </div>
+            <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-emerald-550/30 text-[var(--accent-green)] bg-emerald-500/5">GEOFENCE ACTIVE</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Pulsing Radar Ring Visual */}
+            <div className="w-14 h-14 rounded-full border border-cyan-500/30 relative flex items-center justify-center bg-cyan-950/20 flex-shrink-0">
+              <div className="absolute inset-2 rounded-full border border-cyan-500/20" />
+              <div className="absolute inset-4 rounded-full border border-cyan-500/10" />
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <div className="absolute inset-0 rounded-full border border-cyan-500 animate-ping opacity-25" style={{ animationDuration: '3s' }} />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-[var(--text-primary)]">
+                {nearbyAnomalies.length} structural anomalies detected
+              </p>
+              <p className="text-[9px] font-mono text-[var(--text-muted)] leading-tight">
+                Active issues identified within a 1.0 km radius of your paired GPS target location.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Tab content area ── */}
       <div className="flex-1 overflow-y-auto">
@@ -540,7 +597,7 @@ export const CitizenSimulator: React.FC = () => {
 
         {/* ═══ REPORT TAB ═════════════════════════════════════════════════ */}
         {activeTab === 'report' && (
-          <div className="p-3">
+          <div className="p-3 font-sans">
             {/* Processing state */}
             {submitPhase === 'processing' && (
               <div className="flex flex-col items-center justify-center min-h-[380px] space-y-6 animate-fade-in bg-var(--bg-primary)">
@@ -609,7 +666,7 @@ export const CitizenSimulator: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">File Civic Report</h3>
                   <span className="text-[9px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                    📍 GPS Locked
+                    📍 GPS Ready
                   </span>
                 </div>
 
@@ -620,41 +677,60 @@ export const CitizenSimulator: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => selectPreset('pothole')}
-                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 ${activeScene === 'pothole' ? 'bg-[#FFCC00]10' : 'bg-var(--bg-card)'}`}
-                      style={{ borderColor: activeScene === 'pothole' ? '#FFCC00' : 'var(--border-secondary)' }}
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
+                      style={{ borderColor: activeScene === 'pothole' ? '#FFCC00' : 'var(--border-secondary)', backgroundColor: activeScene === 'pothole' ? 'rgba(255,204,0,0.06)' : 'var(--bg-card)' }}
                     >
                       <Construction className="w-4 h-4 text-[#FFCC00]" />
                       <div>
                         <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Pothole Scene</p>
-                        <p className="text-[7.5px] text-zinc-500">Asphalt Fracture</p>
+                        <p className="text-[7.5px] text-zinc-550">Asphalt Fracture</p>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => selectPreset('water')}
-                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 ${activeScene === 'water' ? 'bg-[#38BDF8]10' : 'bg-var(--bg-card)'}`}
-                      style={{ borderColor: activeScene === 'water' ? '#38BDF8' : 'var(--border-secondary)' }}
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
+                      style={{ borderColor: activeScene === 'water' ? '#38BDF8' : 'var(--border-secondary)', backgroundColor: activeScene === 'water' ? 'rgba(56,189,248,0.06)' : 'var(--bg-card)' }}
                     >
                       <Droplets className="w-4 h-4 text-[#38BDF8]" />
                       <div>
                         <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Water Burst</p>
-                        <p className="text-[7.5px] text-zinc-500">Hydro Leak</p>
+                        <p className="text-[7.5px] text-zinc-550">Hydro Leak</p>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => selectPreset('utility')}
-                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 ${activeScene === 'utility' ? 'bg-[#FF3B30]10' : 'bg-var(--bg-card)'}`}
-                      style={{ borderColor: activeScene === 'utility' ? '#FF3B30' : 'var(--border-secondary)' }}
+                      className="p-2.5 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between h-20 bg-var(--bg-card)"
+                      style={{ borderColor: activeScene === 'utility' ? '#FF3B30' : 'var(--border-secondary)', backgroundColor: activeScene === 'utility' ? 'rgba(255,59,48,0.06)' : 'var(--bg-card)' }}
                     >
                       <Zap className="w-4 h-4 text-[#FF3B30]" />
                       <div>
                         <p className="text-[9.5px] font-bold text-[var(--text-primary)] leading-tight">Utility Spark</p>
-                        <p className="text-[7.5px] text-zinc-500">Grid Danger</p>
+                        <p className="text-[7.5px] text-zinc-550">Grid Danger</p>
                       </div>
                     </button>
+                  </div>
+                </div>
+
+                {/* Geolocation Telemetry */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Paired GPS Telemetry</label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 p-2 rounded border font-mono text-[10px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
+                      <span className="text-[8px] text-[var(--text-muted)] uppercase block">Latitude</span>
+                      <span className="font-bold">{geoCoords.lat.toFixed(5)}° N</span>
+                    </div>
+                    <div className="flex-1 p-2 rounded border font-mono text-[10px] bg-var(--bg-secondary) text-[var(--text-primary)]" style={{ borderColor: 'var(--border-secondary)' }}>
+                      <span className="text-[8px] text-[var(--text-muted)] uppercase block">Longitude</span>
+                      <span className="font-bold">{geoCoords.lng.toFixed(5)}° E</span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded border text-[10px] font-mono bg-var(--bg-secondary)" style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
+                    <span className="text-[8px] uppercase block mb-0.5">Automated Address Matrix</span>
+                    <span className="font-bold text-[var(--text-primary)]">{addressString}</span>
                   </div>
                 </div>
 
@@ -663,7 +739,7 @@ export const CitizenSimulator: React.FC = () => {
                   <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Visual Evidence Screen</label>
                   {!cameraActive ? (
                     <button type="button" onClick={activateCamera}
-                      className="w-full py-4 rounded-lg border border-dashed flex flex-col items-center gap-1.5 cursor-pointer transition-all hover:bg-white/5"
+                      className="w-full py-4 rounded-lg border border-dashed flex flex-col items-center gap-1.5 cursor-pointer transition-all hover:bg-white/5 bg-var(--bg-card)"
                       style={{ borderColor: 'var(--border-secondary)', color: 'var(--text-muted)' }}>
                       <Camera className="w-5 h-5 animate-pulse text-[var(--accent-cyan)]" />
                       <span className="text-[9px] font-mono">Connect Hardware Camera</span>
@@ -738,7 +814,7 @@ export const CitizenSimulator: React.FC = () => {
 
                 {/* Location */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Location / GPS Coordinates</label>
+                  <label className="text-[9px] font-mono uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Location / Telemetry Chips Coordinates</label>
                   <input
                     value={reportLocation}
                     onChange={e => setReportLocation(e.target.value)}
@@ -766,7 +842,7 @@ export const CitizenSimulator: React.FC = () => {
                   {!transcribing ? (
                     <button type="button"
                       onClick={isRecording ? stopRecording : startRecording}
-                      className="w-full py-2.5 rounded-lg border flex items-center justify-center gap-3 cursor-pointer transition-all"
+                      className="w-full py-2.5 rounded-lg border flex items-center justify-center gap-3 cursor-pointer transition-all bg-var(--bg-card)"
                       style={{
                         borderColor: isRecording ? '#FF3B30' : 'var(--border-secondary)',
                         backgroundColor: isRecording ? 'rgba(255,59,48,0.06)' : 'var(--bg-card)',
