@@ -1,11 +1,6 @@
-# Ignore local development and build artifacts
 node_modules/
 dist/
 .git/
 .gradle/
 .vscode/
 package-lock.json
-node_modules/
-.git/
-.gradle/
-dist/
