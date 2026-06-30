@@ -59,39 +59,39 @@ const ToastLayer: React.FC = () => {
 
 // ── Main App Shell (inside context) ──────────────────────────────────────
 const AppShell: React.FC = () => {
-  const { session, setSession, theme, toggleTheme } = useZelus();
+  const { session, setSession, isAuthenticated, setAuthenticated, theme, toggleTheme } = useZelus();
   const [booting, setBooting] = useState(true);
   const [appView, setAppView] = useState<'search' | 'app'>(() => {
     const hasSession = localStorage.getItem('zelus_session');
+    const isAuth = localStorage.getItem('zelus_authenticated') === 'true';
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
-    if (hasSession || roleParam) return 'app';
+    if ((hasSession && isAuth) || roleParam) return 'app';
     return 'search';
   });
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
-    if (roleParam === 'Citizen' || roleParam === 'Admin' || roleParam === 'Contractor') {
-      const username = roleParam === 'Admin' ? 'admin_zero' : roleParam === 'Citizen' ? 'citizen_hero' : 'contractor_alpha';
-      const initialXP = roleParam === 'Citizen' ? 120 : roleParam === 'Contractor' ? 150 : 0;
-      const badges = roleParam === 'Citizen' ? ['Water Watcher'] : roleParam === 'Contractor' ? ['Vetted Contractor'] : ['System Admin'];
-      setSession({ username, role: roleParam, karmaXP: initialXP, badges });
-      setAppView('app');
-      
+    if (roleParam) {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
-  }, [setSession]);
+  }, []);
 
   const handleLogin = (username: string, role: UserRole) => {
     const initialXP = role === 'Citizen' ? 120 : role === 'Contractor' ? 150 : 0;
     const badges = role === 'Citizen' ? ['Water Watcher'] : role === 'Contractor' ? ['Vetted Contractor'] : ['System Admin'];
     setSession({ username, role, karmaXP: initialXP, badges });
+    setAuthenticated(true);
   };
 
   const handleLogout = () => {
+    setAuthenticated(false);
     setSession(null);
+    localStorage.removeItem('zelus_session');
+    localStorage.removeItem('zelus_authenticated');
+    sessionStorage.clear();
     setAppView('search');
   };
 
@@ -112,7 +112,6 @@ const AppShell: React.FC = () => {
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         <MockSearchEngine
           onEnter={() => {
-            handleLogin('citizen_hero', 'Citizen');
             setAppView('app');
           }}
         />
@@ -135,7 +134,7 @@ const AppShell: React.FC = () => {
         </div>
 
         {/* Center: Role switcher */}
-        {session && (
+        {session && isAuthenticated && (
           <div className="flex items-center gap-1">
             {([
               { role: 'Admin' as UserRole,      label: 'Admin Portal',        icon: <Shield className="w-3 h-3"/> },
@@ -172,14 +171,14 @@ const AppShell: React.FC = () => {
               ? <Sun className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
               : <Moon className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
           </button>
-          {session && (
+          {session && isAuthenticated && (
             <button onClick={handleLogout} className="flex items-center gap-1 px-2 rounded text-[9px] font-mono cursor-pointer hover:bg-red-500/10 transition-all"
               style={{ color: 'var(--text-muted)', height: '22px' }}>
               <LogOut className="w-3 h-3"/>
               <span className="hidden sm:inline">Exit</span>
             </button>
           )}
-          {!session && (
+          {(!session || !isAuthenticated) && (
             <button onClick={() => {}} className="px-2 rounded text-[9px] font-mono cursor-pointer"
               style={{ color: 'var(--text-muted)', height: '22px' }}>
               Access Portal
@@ -191,15 +190,15 @@ const AppShell: React.FC = () => {
       {/* ── PAGE CONTENT (padded for header) ──────────────────────────── */}
       <div className="flex-1 flex flex-col" style={{ paddingTop: '36px' }}>
 
-        {/* No session → Login */}
-        {!session && (
+        {/* No session or not authenticated → Login */}
+        {(!session || !isAuthenticated) && (
           <div className="min-h-screen flex flex-col justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
             <LoginScreen onLogin={handleLogin} theme={theme} />
           </div>
         )}
 
         {/* Citizen → Mobile viewport */}
-        {session?.role === 'Citizen' && (
+        {session && isAuthenticated && session.role === 'Citizen' && (
           <div className="min-h-screen w-full flex items-center justify-center transition-all duration-300" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <MobileViewport theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} username={session.username}>
               <CitizenSimulator />
@@ -208,7 +207,7 @@ const AppShell: React.FC = () => {
         )}
 
         {/* Admin → Gov Dashboard */}
-        {session?.role === 'Admin' && (
+        {session && isAuthenticated && session.role === 'Admin' && (
           <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full transition-all duration-300">
             {/* Weather ticker */}
             <div className="mb-4 py-1.5 px-4 rounded-lg border text-[9.5px] font-mono flex items-center justify-between"
@@ -224,7 +223,7 @@ const AppShell: React.FC = () => {
         )}
 
         {/* Contractor → Contractor Dashboard */}
-        {session?.role === 'Contractor' && (
+        {session && isAuthenticated && session.role === 'Contractor' && (
           <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full transition-all duration-300">
             <div className="mb-4 flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-secondary)' }}>
               <div>

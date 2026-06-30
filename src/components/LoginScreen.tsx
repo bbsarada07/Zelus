@@ -10,9 +10,24 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, theme = 'dark' }) => {
   const isDark = theme === 'dark';
   
-  const [username, setUsername] = useState('admin_zero');
+  const [role, setRole] = useState<UserRole>(() => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const roleParam = params?.get('role');
+    if (roleParam === 'Citizen' || roleParam === 'Admin' || roleParam === 'Contractor') {
+      return roleParam;
+    }
+    return 'Admin';
+  });
+
+  const [username, setUsername] = useState(() => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const roleParam = params?.get('role');
+    if (roleParam === 'Citizen') return 'citizen_hero';
+    if (roleParam === 'Contractor') return 'contractor_alpha';
+    return 'admin_zero';
+  });
+
   const [password, setPassword] = useState('••••••••');
-  const [role, setRole] = useState<UserRole>('Admin');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGlitching, setIsGlitching] = useState(false);
 

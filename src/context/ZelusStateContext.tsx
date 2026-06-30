@@ -54,6 +54,7 @@ export interface ZelusState {
   bounties: Bounty[];
   webhookLogs: WebhookLog[];
   session: UserSession | null;
+  isAuthenticated: boolean;
   theme: Theme;
   trustScore: number;
   sectorGrades: SectorGrade[];
@@ -62,6 +63,7 @@ export interface ZelusState {
 
   // Session actions
   setSession: (s: UserSession | null) => void;
+  setAuthenticated: (a: boolean) => void;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
   toggleIsolation: () => void;
@@ -103,6 +105,7 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [bounties] = useState<Bounty[]>(() => loadLS('zelus_bounties', initialBounties));
   const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>(() => loadLS('zelus_webhooks', []));
   const [session, setSessionRaw] = useState<UserSession | null>(() => loadLS('zelus_session', null));
+  const [isAuthenticated, setIsAuthenticatedRaw] = useState<boolean>(() => loadLS('zelus_authenticated', false));
   const [theme, setThemeRaw] = useState<Theme>(() => (loadLS('zelus_theme', 'dark') as Theme));
   const [isIsolated, setIsIsolated] = useState(false);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -125,6 +128,11 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setSessionRaw(s);
     if (s) localStorage.setItem('zelus_session', JSON.stringify(s));
     else localStorage.removeItem('zelus_session');
+  }, []);
+
+  const setAuthenticated = useCallback((auth: boolean) => {
+    setIsAuthenticatedRaw(auth);
+    localStorage.setItem('zelus_authenticated', JSON.stringify(auth));
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
@@ -237,6 +245,7 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'zelus_incidents' && e.newValue) try { setIncidentsRaw(JSON.parse(e.newValue)); } catch { /**/ }
       if (e.key === 'zelus_session') try { setSessionRaw(e.newValue ? JSON.parse(e.newValue) : null); } catch { /**/ }
+      if (e.key === 'zelus_authenticated') try { setIsAuthenticatedRaw(e.newValue ? JSON.parse(e.newValue) : false); } catch { /**/ }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
@@ -273,8 +282,8 @@ export const ZelusStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [setIncidents]);
 
   const value: ZelusState = {
-    incidents, bounties, webhookLogs, session, theme, trustScore, sectorGrades, toasts, isIsolated,
-    setSession, setTheme, toggleTheme, toggleIsolation,
+    incidents, bounties, webhookLogs, session, isAuthenticated, theme, trustScore, sectorGrades, toasts, isIsolated,
+    setSession, setAuthenticated, setTheme, toggleTheme, toggleIsolation,
     addIncident, upvoteIncident, authorizeDispatch, claimBounty, updateStage, submitProgress, confirmResolution,
     updateIncidentSync, updateKarma, addToast, dismissToast,
   };
