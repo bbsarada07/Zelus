@@ -1,0 +1,8 @@
+# Ignore local development and build artifacts
+node_modules/
+dist/
+.git/
+.gradle/
+.vscode/
+package-lock.json
+# Ensure we keep only what is needed for the Docker build
