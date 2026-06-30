@@ -127,3 +127,24 @@ npm install
 npm run dev
 ```
 4. Open http://localhost:5173 in your browser.
+---
+
+## License & Security
+
+License: Distributed under the MIT License.
+
+Security: This repository uses a high-priority .gitignore to prevent the exposure of Google Gemini API keys and sensitive environment variables. 
+
+All previously detected secrets have been fully revoked and rotated.
+
+---
+
+## Developed by Team Zenthra
+
+Focus Theme: Community Hero - Hyperlocal Problem Solver
+
+Project Lead: B.Bhuvana Sarada
+
+Hackathon: Vibe2Ship (2026)
+
+---
