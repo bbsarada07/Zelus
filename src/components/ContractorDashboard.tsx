@@ -151,7 +151,11 @@ const RoutingGrid: React.FC<{ incidents: Incident[] }> = ({ incidents }) => {
 };
 
 export const ContractorDashboard: React.FC = () => {
-  const { incidents, session, claimBounty, updateStage, submitProgress, addToast } = useZelus();
+  const { incidents, session, isAuthenticated, claimBounty, updateStage, submitProgress, addToast } = useZelus();
+
+  if (!isAuthenticated || session?.role !== 'Contractor') {
+    return null;
+  }
 
   const myIncidents = incidents.filter(i =>
     i.status === 'Claimed_In_Progress' && i.claimedBy === session?.username

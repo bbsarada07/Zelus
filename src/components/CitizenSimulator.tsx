@@ -208,9 +208,13 @@ function getCatIcon(cat: string): React.ReactNode {
 
 export const CitizenSimulator: React.FC = () => {
   const {
-    incidents, session, addIncident, upvoteIncident,
+    incidents, session, isAuthenticated, addIncident, upvoteIncident,
     updateKarma, confirmResolution, sectorGrades, trustScore, addToast, updateIncidentSync
   } = useZelus();
+
+  if (!isAuthenticated || session?.role !== 'Citizen') {
+    return null;
+  }
 
   const [activeTab, setActiveTab] = useState<'feed' | 'report' | 'ledger'>('feed');
 

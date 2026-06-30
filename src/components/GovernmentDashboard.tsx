@@ -70,9 +70,13 @@ const playSciFiSound = () => {
 
 export const GovernmentDashboard: React.FC = () => {
   const {
-    incidents, authorizeDispatch, addIncident,
+    incidents, session, isAuthenticated, authorizeDispatch, addIncident,
     sectorGrades, trustScore, webhookLogs, isIsolated, toggleIsolation
   } = useZelus();
+
+  if (!isAuthenticated || session?.role !== 'Admin') {
+    return null;
+  }
 
   const weatherMultiplier = 1.05 + Math.random() * 0.4;
 

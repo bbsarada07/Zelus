@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Bounty } from '../types';
 import { Award, Heart, CheckCircle2, Coins, Users } from 'lucide-react';
+import { useZelus } from '../context/ZelusStateContext';
 
 interface BountyMarketProps {
   bounties: Bounty[];
@@ -9,6 +10,11 @@ interface BountyMarketProps {
 }
 
 export const BountyMarket: React.FC<BountyMarketProps> = ({ bounties, onCastVote, onVerify }) => {
+  const { session, isAuthenticated } = useZelus();
+
+  if (!isAuthenticated || session?.role !== 'Contractor') {
+    return null;
+  }
   return (
     <div className="space-y-6">
       {/* Top Banner Overview */}
@@ -58,6 +64,12 @@ export const BountyMarket: React.FC<BountyMarketProps> = ({ bounties, onCastVote
                 <h3 className="text-sm font-semibold tracking-tight text-zinc-100 group-hover:text-white transition-colors">
                   {bounty.title}
                 </h3>
+                {session?.role === 'Contractor' && (
+                  <div className="text-[9px] font-mono font-bold text-zinc-450 mt-1.5 flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded w-fit">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                    Assigned Task: Structural Repair, Pothole B39
+                  </div>
+                )}
                 <p className="text-xs text-zinc-450 mt-1.5 leading-relaxed line-clamp-3">
                   {bounty.description}
                 </p>

@@ -1,14 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Sun, Moon, LogOut, Shield, Smartphone, Hammer, X, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { ZelusStateProvider, useZelus } from './context/ZelusStateContext';
 import { ZetaLoader } from './components/ZetaLoader';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileViewport } from './components/MobileViewport';
-import { CitizenSimulator } from './components/CitizenSimulator';
-import { GovernmentDashboard } from './components/GovernmentDashboard';
-import { ContractorDashboard } from './components/ContractorDashboard';
 import { MockSearchEngine } from './components/MockSearchEngine';
 import type { UserRole } from './types';
+
+const CitizenSimulator = lazy(() => import('./components/CitizenSimulator').then(m => ({ default: m.CitizenSimulator })));
+const GovernmentDashboard = lazy(() => import('./components/GovernmentDashboard').then(m => ({ default: m.GovernmentDashboard })));
+const ContractorDashboard = lazy(() => import('./components/ContractorDashboard').then(m => ({ default: m.ContractorDashboard })));
+
+const DashboardFallback: React.FC = () => (
+  <div className="flex-1 flex flex-col items-center justify-center min-h-[400px] space-y-4 font-mono">
+    <div className="flex items-center gap-2">
+      <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping" />
+      <span className="text-xs uppercase tracking-[0.2em]" style={{ color: 'var(--accent-cyan, #00FFCC)' }}>
+        Loading Secure Portal Node...
+      </span>
+    </div>
+    <div className="w-48 h-1 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+      <div className="h-full bg-cyan-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+    </div>
+  </div>
+);
 
 // ── Toast Layer ───────────────────────────────────────────────────────────
 const ToastLayer: React.FC = () => {
@@ -78,6 +93,17 @@ const AppShell: React.FC = () => {
       window.history.replaceState({}, document.title, newUrl);
     }
   }, []);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (!isAuthenticated) {
+        window.history.pushState(null, '', window.location.pathname);
+        setAppView('search');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isAuthenticated]);
 
   const handleLogin = (username: string, role: UserRole) => {
     const initialXP = role === 'Citizen' ? 120 : role === 'Contractor' ? 150 : 0;
@@ -200,7 +226,9 @@ const AppShell: React.FC = () => {
         {session && isAuthenticated && session.role === 'Citizen' && (
           <div className="min-h-screen w-full flex items-center justify-center transition-all duration-300" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <MobileViewport theme={theme} onToggleTheme={toggleTheme} onLogout={handleLogout} username={session.username}>
-              <CitizenSimulator />
+              <Suspense fallback={<DashboardFallback />}>
+                <CitizenSimulator />
+              </Suspense>
             </MobileViewport>
           </div>
         )}
@@ -217,7 +245,9 @@ const AppShell: React.FC = () => {
                 LEDGER SECURE
               </span>
             </div>
-            <GovernmentDashboard />
+            <Suspense fallback={<DashboardFallback />}>
+              <GovernmentDashboard />
+            </Suspense>
           </div>
         )}
 
@@ -235,7 +265,9 @@ const AppShell: React.FC = () => {
                 Logged in as: <span style={{ color: 'var(--accent-cyan)' }}>{session.username}</span>
               </div>
             </div>
-            <ContractorDashboard />
+            <Suspense fallback={<DashboardFallback />}>
+              <ContractorDashboard />
+            </Suspense>
           </div>
         )}
       </div>
