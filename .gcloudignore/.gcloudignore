@@ -5,4 +5,7 @@ dist/
 .gradle/
 .vscode/
 package-lock.json
-# Ensure we keep only what is needed for the Docker build
+node_modules/
+.git/
+.gradle/
+dist/
