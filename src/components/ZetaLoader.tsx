@@ -21,6 +21,11 @@ export const ZetaLoader: React.FC<ZetaLoaderProps> = ({ onComplete, theme }) => 
 
   const isDark = theme === 'dark';
 
+  const onCompleteRef = React.useRef(onComplete);
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   useEffect(() => {
     // Reveal terminal lines sequentially
     BOOT_STEPS.forEach((step, i) => {
@@ -39,14 +44,14 @@ export const ZetaLoader: React.FC<ZetaLoaderProps> = ({ onComplete, theme }) => 
 
     // Fade out and complete at 2500ms
     const fadeTimer = setTimeout(() => setFading(true), 2100);
-    const completeTimer = setTimeout(() => onComplete(), 2500);
+    const completeTimer = setTimeout(() => onCompleteRef.current(), 2500);
 
     return () => {
       clearInterval(tick);
       clearTimeout(fadeTimer);
       clearTimeout(completeTimer);
     };
-  }, [onComplete]);
+  }, []);
 
   return (
     <div

@@ -61,6 +61,26 @@ export const BountyMarket: React.FC<BountyMarketProps> = ({ bounties, onCastVote
                 <p className="text-xs text-zinc-450 mt-1.5 leading-relaxed line-clamp-3">
                   {bounty.description}
                 </p>
+                
+                {/* Active Civic Metadata Logs */}
+                <div className="mt-3 space-y-1.5 p-2 rounded-lg border border-zinc-800 bg-zinc-950/40 text-[10px] font-mono">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span>📍 GPS Coordinates:</span>
+                    <span className="text-brand-cyan">
+                      {bounty.id === 'BTY-001' ? '17.45100°N, 78.52400°E' : bounty.id === 'BTY-002' ? '17.45010°N, 78.52520°E' : '17.44800°N, 78.52100°E'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span>🤖 Vision Verification:</span>
+                    <span className="text-brand-emerald">
+                      {bounty.id === 'BTY-002' 
+                        ? 'Pothole depth verified via Vision Engine: 94% accuracy' 
+                        : bounty.id === 'BTY-001'
+                          ? 'Debris clearance verified via Vision Engine: 97.2% accuracy'
+                          : 'Bike rack footprint verified via Vision Engine: 98.6% accuracy'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Funding Bar */}

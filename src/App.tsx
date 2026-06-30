@@ -87,11 +87,10 @@ const AppShell: React.FC = () => {
   };
 
   const handleLogout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
     setAuthenticated(false);
     setSession(null);
-    localStorage.removeItem('zelus_session');
-    localStorage.removeItem('zelus_authenticated');
-    sessionStorage.clear();
     setAppView('search');
   };
 
